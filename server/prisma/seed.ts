@@ -233,7 +233,71 @@ function generateNetwork(): SeedEquipment[] {
   });
 }
 
+/** Regiões da cidade e seus bairros (visão consolidada da Central de Operações). */
+const REGIONS: { code: string; name: string; districts: string[] }[] = [
+  { code: "CENTRO", name: "Centro", districts: ["Centro"] },
+  { code: "NORTE", name: "Zona Norte", districts: ["Jardim Cavallari", "Alto Cafezal"] },
+  { code: "LESTE", name: "Zona Leste", districts: ["Palmital", "Jardim Maria Izabel"] },
+  { code: "SUL", name: "Zona Sul", districts: ["Cascata", "Nova Marília"] },
+  { code: "OESTE", name: "Zona Oeste", districts: ["Fragata", "Somenzari"] },
+  { code: "RODOVIAS", name: "Rodovias e zona rural", districts: ["Zona Rural"] },
+];
+
+/** Órgão responsável conforme o tipo (e, para viaturas, a corporação). */
+function agencyFor(type: string, attributes: Record<string, unknown>) {
+  if (type === "CAMERA") return "GUARDA_MUNICIPAL";
+  if (type === "VIATURA") return attributes.corporacao === "POLICIA_MILITAR" ? "POLICIA_MILITAR" : "GUARDA_MUNICIPAL";
+  if (["TOTEM_ESTACIONAMENTO", "CANCELA", "PATINETE"].includes(type)) return "CONCESSIONARIA";
+  return "TRANSITO";
+}
+
+/** Medições típicas de cada tipo de dispositivo, usadas nas leituras de telemetria. */
+function metricsFor(type: string): Record<string, number> {
+  switch (type) {
+    case "RADAR":
+      return { veiculosHora: 200 + Math.floor(random() * 600), velocidadeMedia: 35 + Math.floor(random() * 20), infracoesHora: Math.floor(random() * 12) };
+    case "CAMERA":
+      return { fps: 24 + Math.floor(random() * 7), bitrateKbps: 2500 + Math.floor(random() * 3000) };
+    case "BALANCA":
+      return { pesagensHora: 20 + Math.floor(random() * 60), excessosHora: Math.floor(random() * 5) };
+    case "TOTEM_ESTACIONAMENTO":
+      return { transacoesHora: Math.floor(random() * 40), papelPct: 20 + Math.floor(random() * 80) };
+    case "CANCELA":
+      return { aberturasHora: Math.floor(random() * 120) };
+    case "PATINETE":
+      return { bateriaPct: 15 + Math.floor(random() * 85) };
+    default:
+      return { velocidade: Math.floor(random() * 60), ignicao: random() > 0.3 ? 1 : 0 };
+  }
+}
+
+const FIELD_STATUS_BY_AGENT: Record<string, string> = {
+  "AT-1021": "EM_ATENDIMENTO",
+  "AT-1045": "DISPONIVEL",
+  "GM-2210": "EM_DESLOCAMENTO",
+  "GM-2234": "EM_PAUSA",
+  "PM-90871": "DISPONIVEL",
+};
+
+const MINUTE_MS = 60 * 1000;
+const secondsAgo = (s: number) => new Date(Date.now() - s * 1000);
+
+/** Último contato do dispositivo: a maioria online, falhas às vezes offline e alguns "silenciosos". */
+function lastSeenFor(status: string) {
+  if (["NAO_INSTALADO", "DESATIVADO", "FURTADO", "BAIXADO"].includes(status)) return null;
+  const offline = status === "MAU_FUNCIONAMENTO" ? random() < 0.5 : random() < 0.08;
+  return offline ? secondsAgo(20 * 60 + Math.floor(random() * 100 * 60)) : secondsAgo(Math.floor(random() * 90));
+}
+
+const UNAVAILABLE = ["MAU_FUNCIONAMENTO", "EM_MANUTENCAO", "DESATIVADO", "FURTADO"];
+
 async function main() {
+  await prisma.alert.deleteMany();
+  await prisma.availabilitySnapshot.deleteMany();
+  await prisma.telemetryReading.deleteMany();
+  await prisma.agentPosition.deleteMany();
+  await prisma.district.deleteMany();
+  await prisma.region.deleteMany();
   await prisma.equipmentEvent.deleteMany();
   await prisma.equipment.deleteMany();
   await prisma.agent.deleteMany();
@@ -253,9 +317,34 @@ async function main() {
     typeIds[t.code] = created.id;
   }
 
+  const regionIds: Record<string, string> = {};
+  const regionOfDistrict: Record<string, string> = {};
+  for (const r of REGIONS) {
+    const region = await prisma.region.create({
+      data: { code: r.code, name: r.name, districts: { create: r.districts.map((name) => ({ name })) } },
+    });
+    regionIds[r.code] = region.id;
+    r.districts.forEach((d) => (regionOfDistrict[d] = r.code));
+  }
+
   const agentIds: Record<string, string> = {};
   for (const a of agents) {
-    const created = await prisma.agent.create({ data: { ...a, city: "Marília", state: "SP" } });
+    // Trilha dos últimos 25 minutos, terminando na posição atual
+    const trail = Array.from({ length: 6 }, (_, i) => ({
+      latitude: a.latitude + (5 - i) * 0.0009 * (random() - 0.3),
+      longitude: a.longitude + (5 - i) * 0.0009 * (random() - 0.3),
+      recordedAt: secondsAgo((5 - i) * 5 * 60 + 30),
+    }));
+    const created = await prisma.agent.create({
+      data: {
+        ...a,
+        city: "Marília",
+        state: "SP",
+        fieldStatus: FIELD_STATUS_BY_AGENT[a.registration] ?? "DISPONIVEL",
+        lastPositionAt: trail[trail.length - 1].recordedAt,
+        positions: { create: trail },
+      },
+    });
     agentIds[a.registration] = created.id;
   }
 
@@ -361,12 +450,23 @@ async function main() {
     }).flat();
     failureEvents += pastFailures;
 
+    const lastSeenAt = lastSeenFor(e.status);
+    const readings = lastSeenAt
+      ? [0, 60, 120].map((offset) => ({
+          metrics: JSON.stringify(metricsFor(type)),
+          receivedAt: new Date(lastSeenAt.getTime() - offset * 1000),
+        }))
+      : [];
+
     await prisma.equipment.create({
       data: {
         ...e,
         city: "Marília",
         state: "SP",
         typeId: typeIds[type],
+        agency: agencyFor(type, attributes),
+        lastSeenAt,
+        readings: { create: readings },
         attributes: JSON.stringify(attributes),
         responsibleAgentId: responsible ? agentIds[responsible] : null,
         events: {
@@ -379,8 +479,35 @@ async function main() {
     });
   }
 
+  const activeAgents = Object.values(FIELD_STATUS_BY_AGENT).filter((s) => s !== "EM_PAUSA" && s !== "SEM_SINAL").length;
+  const scopes: { regionId: string | null; items: SeedEquipment[] }[] = [
+    { regionId: null, items: all },
+    ...REGIONS.map((r) => ({ regionId: regionIds[r.code], items: all.filter((e) => regionOfDistrict[e.district] === r.code) })),
+  ];
+  const snapshots = scopes.flatMap(({ regionId, items }) => {
+    const total = items.length;
+    const installed = items.filter((e) => e.status !== "NAO_INSTALADO" && e.status !== "BAIXADO").length;
+    const unavailableNow = items.filter((e) => UNAVAILABLE.includes(e.status)).length;
+    return Array.from({ length: 24 }, (_, h) => {
+      // Oscilação ao longo do dia, com pico de indisponibilidade no fim da tarde
+      const swing = Math.round((Math.sin((h / 24) * Math.PI * 2) + random() - 0.5) * Math.max(1, installed * 0.06));
+      const unavailable = Math.min(installed, Math.max(0, unavailableNow + swing));
+      return {
+        regionId,
+        takenAt: new Date(Date.now() - (24 - h) * 60 * MINUTE_MS),
+        total,
+        installed,
+        operational: installed - unavailable,
+        unavailable,
+        activeAgents: regionId ? 0 : activeAgents,
+        openAlerts: Math.max(0, Math.round(unavailable * 0.8)),
+      };
+    });
+  });
+  await prisma.availabilitySnapshot.createMany({ data: snapshots });
+
   console.log(
-    `Seed concluído: ${types.length} tipos, ${agents.length} agentes, ${all.length} equipamentos, ${failureEvents} falhas históricas.`,
+    `Seed concluído: ${types.length} tipos, ${agents.length} agentes, ${all.length} equipamentos, ${failureEvents} falhas históricas, ${REGIONS.length} regiões, ${snapshots.length} registros de disponibilidade.`,
   );
 }
 

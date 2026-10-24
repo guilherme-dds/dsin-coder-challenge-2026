@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { notFound } from "../../lib/http-error.js";
+import { AGENT_FIELD_STATUSES } from "../../domain/field-status.js";
 
 export const AGENT_ROLES = ["AGENTE_TRANSITO", "GUARDA_MUNICIPAL", "POLICIAL_MILITAR"] as const;
 export const SHIFTS = ["MANHA", "TARDE", "NOITE", "MADRUGADA"] as const;
@@ -21,6 +22,7 @@ const agentInput = z.object({
   latitude: z.number().min(-90).max(90).nullish(),
   longitude: z.number().min(-180).max(180).nullish(),
   active: z.boolean().default(true),
+  fieldStatus: z.enum(AGENT_FIELD_STATUSES).optional(),
 });
 
 const agentFilters = z.object({

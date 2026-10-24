@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { EQUIPMENT_STATUSES, MAINTENANCE_TYPES } from "../../domain/status.js";
 import { URGENCY_LEVELS } from "../../domain/urgency.js";
+import { AGENCIES } from "../../domain/agency.js";
 
 export const equipmentInput = z.object({
   typeId: z.string().min(1),
@@ -8,6 +9,8 @@ export const equipmentInput = z.object({
   brand: z.string().trim().min(1),
   model: z.string().trim().min(1),
   status: z.enum(EQUIPMENT_STATUSES).default("NAO_INSTALADO"),
+  // Opcional: na ausência, o banco assume TRANSITO (e uma edição não sobrescreve o valor atual).
+  agency: z.enum(AGENCIES).optional(),
 
   zipCode: z.string().regex(/^\d{5}-?\d{3}$/, "CEP inválido"),
   street: z.string().trim().min(1),

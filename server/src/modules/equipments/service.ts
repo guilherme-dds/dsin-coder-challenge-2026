@@ -4,6 +4,7 @@ import { HttpError, notFound } from "../../lib/http-error.js";
 import { buildAttributesValidator, type AttributeField } from "../../domain/dynamic-attributes.js";
 import { canTransition, type EquipmentStatus, type MaintenanceType } from "../../domain/status.js";
 import { urgency } from "../../domain/urgency.js";
+import { connectivity } from "../../domain/connectivity.js";
 import { toTypeDto } from "../equipment-types/routes.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -20,6 +21,7 @@ export function toEquipmentDto(equipment: EquipmentWithType) {
       maintenanceType: equipment.maintenanceType as MaintenanceType,
       nextMaintenanceAt: equipment.nextMaintenanceAt,
     }),
+    connectivity: connectivity(equipment.status as EquipmentStatus, equipment.lastSeenAt),
   };
 }
 

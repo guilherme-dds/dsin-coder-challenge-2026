@@ -37,10 +37,14 @@ model Equipment {
   /// Ver src/domain/status.ts (máquina de estados)
   status String @default("NAO_INSTALADO")
 
+  /// Órgão responsável pela operação: TRANSITO | GUARDA_MUNICIPAL | POLICIA_MILITAR | CONCESSIONARIA
+  agency String @default("TRANSITO")
+
   // Localização de instalação (ou da base, para equipamentos móveis)
   zipCode   String
   street    String
   reference String
+  /// A região é obtida pelo bairro (tabela District)
   district  String
   city      String
   state     String
@@ -55,12 +59,17 @@ model Equipment {
   /// JSON com os valores dos atributos dinâmicos do tipo
   attributes String @default("{}")
 
+  /// Último contato recebido do dispositivo; a conectividade é calculada a partir dele
+  lastSeenAt DateTime?
+
   responsibleAgentId String?
   responsibleAgent   Agent?  @relation(fields: [responsibleAgentId], references: [id])
 
   events    EquipmentEvent[]
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  readings  TelemetryReading[]
+  alerts    Alert[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
   @@index([status])
   @@index([district])
@@ -83,6 +92,18 @@ model EquipmentEvent {
   @@index([equipmentId, createdAt])
 }
 
+/// Leitura enviada por um dispositivo IoT ao PROMETHEUS.
+model TelemetryReading {
+  id          String    @id @default(cuid())
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  /// JSON com as medições do dispositivo (ex.: {"veiculosHora": 420} ou {"fps": 25})
+  metrics     String    @default("{}")
+  receivedAt  DateTime  @default(now())
+
+  @@index([equipmentId, receivedAt])
+}
+
 model Agent {
   id           String  @id @default(cuid())
   name         String
@@ -98,13 +119,94 @@ model Agent {
   district     String
   city         String
   state        String
-  /// Posição da base (ou última posição conhecida) para exibição no mapa operacional
+  /// Posição atual do agente (ou da base, enquanto não houver rastreamento)
   latitude     Float?
   longitude    Float?
   active       Boolean @default(true)
 
+  /// Situação em campo: DISPONIVEL | EM_ATENDIMENTO | EM_DESLOCAMENTO | EM_PAUSA | SEM_SINAL
+  fieldStatus    String    @default("DISPONIVEL")
+  lastPositionAt DateTime?
+
   responsibleFor Equipment[]
   events         EquipmentEvent[]
+  positions      AgentPosition[]
+  alerts         Alert[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
+}
+
+/// Trilha de posições enviadas pelos agentes em campo.
+model AgentPosition {
+  id         String   @id @default(cuid())
+  agentId    String
+  agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  latitude   Float
+  longitude  Float
+  recordedAt DateTime @default(now())
+
+  @@index([agentId, recordedAt])
+}
+
+/// Agrupamento de bairros usado na visão consolidada da cidade.
+model Region {
+  id        String                 @id @default(cuid())
+  code      String                 @unique
+  name      String
+  districts District[]
+  alerts    Alert[]
+  snapshots AvailabilitySnapshot[]
+}
+
+model District {
+  id       String @id @default(cuid())
+  name     String @unique
+  regionId String
+  region   Region @relation(fields: [regionId], references: [id])
+}
+
+/// Alerta operacional gerado pelo motor de regras (ou por um operador).
+model Alert {
+  id        String  @id @default(cuid())
+  /// Regra que gerou o alerta (ver src/domain/alerts.ts)
+  kind      String
+  /// CRITICA | ALTA | MEDIA | BAIXA
+  severity  String
+  /// ABERTO | RECONHECIDO | RESOLVIDO
+  status    String  @default("ABERTO")
+  title     String
+  message   String?
+  /// Evita alertas repetidos: no máximo um alerta não resolvido por regra + origem
+  dedupKey  String
+
+  equipmentId String?
+  equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  agentId     String?
+  agent       Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
+  regionId    String?
+  region      Region?    @relation(fields: [regionId], references: [id], onDelete: SetNull)
+
+  openedAt       DateTime  @default(now())
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  resolvedAt     DateTime?
+
+  @@index([status, severity])
+  @@index([dedupKey, status])
+}
+
+/// Fotografia periódica da disponibilidade (cidade inteira quando regionId é nulo), para gráficos.
+model AvailabilitySnapshot {
+  id           String   @id @default(cuid())
+  takenAt      DateTime @default(now())
+  regionId     String?
+  region       Region?  @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  total        Int
+  installed    Int
+  operational  Int
+  unavailable  Int
+  activeAgents Int
+  openAlerts   Int
+
+  @@index([regionId, takenAt])
 }
