@@ -1,0 +1,110 @@
+// SQLite para desenvolvimento; trocar o provider para "postgresql" em produção
+// (campos JSON são guardados como String para manter compatibilidade entre bancos).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Tipo de equipamento com atributos dinâmicos: o administrador define os campos
+/// específicos (ex.: "visão noturna" para câmeras) sem precisar alterar código.
+model EquipmentType {
+  id               String      @id @default(cuid())
+  code             String      @unique
+  name             String
+  category         String
+  /// Equipamentos móveis (viaturas, patinetes...) registram a localização da BASE.
+  mobile           Boolean     @default(false)
+  /// JSON: AttributeField[] (ver src/domain/dynamic-attributes.ts)
+  attributesSchema String      @default("[]")
+  equipments       Equipment[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model Equipment {
+  id           String        @id @default(cuid())
+  serialNumber String        @unique
+  brand        String
+  model        String
+  typeId       String
+  type         EquipmentType @relation(fields: [typeId], references: [id])
+
+  /// Ver src/domain/status.ts (máquina de estados)
+  status String @default("NAO_INSTALADO")
+
+  // Localização de instalação (ou da base, para equipamentos móveis)
+  zipCode   String
+  street    String
+  reference String
+  district  String
+  city      String
+  state     String
+  latitude  Float
+  longitude Float
+
+  // Manutenção: NENHUMA | IMEDIATA | PERIODICA | AGENDADA
+  maintenanceType         String    @default("NENHUMA")
+  nextMaintenanceAt       DateTime?
+  maintenanceIntervalDays Int?
+
+  /// JSON com os valores dos atributos dinâmicos do tipo
+  attributes String @default("{}")
+
+  responsibleAgentId String?
+  responsibleAgent   Agent?  @relation(fields: [responsibleAgentId], references: [id])
+
+  events    EquipmentEvent[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([status])
+  @@index([district])
+}
+
+/// Histórico imutável de tudo o que aconteceu com o equipamento (também alimenta a camada de calor de falhas).
+model EquipmentEvent {
+  id          String    @id @default(cuid())
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  /// CRIADO | ATUALIZADO | STATUS_ALTERADO | MANUTENCAO_AGENDADA | MANUTENCAO_CONCLUIDA
+  kind        String
+  fromStatus  String?
+  toStatus    String?
+  note        String?
+  agentId     String?
+  agent       Agent?    @relation(fields: [agentId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([equipmentId, createdAt])
+}
+
+model Agent {
+  id           String  @id @default(cuid())
+  name         String
+  registration String  @unique
+  /// AGENTE_TRANSITO | GUARDA_MUNICIPAL | POLICIAL_MILITAR
+  role         String
+  rank         String?
+  phone        String?
+  email        String?
+  /// MANHA | TARDE | NOITE | MADRUGADA
+  shift        String?
+  baseName     String
+  district     String
+  city         String
+  state        String
+  /// Posição da base (ou última posição conhecida) para exibição no mapa operacional
+  latitude     Float?
+  longitude    Float?
+  active       Boolean @default(true)
+
+  responsibleFor Equipment[]
+  events         EquipmentEvent[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
