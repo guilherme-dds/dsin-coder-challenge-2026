@@ -1,0 +1,18 @@
+{
+  "name": "fogo-mapa-operacional",
+  "private": true,
+  "description": "Inventário Inteligente da Cidade (F.O.G.O.) — mapa operacional de equipamentos e agentes de segurança e trânsito.",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "setup": "npm install && npm run db:setup -w server",
+    "dev": "concurrently -n api,web -c red,cyan \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w server && npm run build -w web",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
