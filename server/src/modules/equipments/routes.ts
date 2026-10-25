@@ -15,6 +15,7 @@ import {
 import type { TelemetryMetrics } from "../../domain/telemetry.js";
 import { changeStatus, toEquipmentDto, validateAttributes } from "./service.js";
 import { scheduleAlertEvaluation } from "../alerts/engine.js";
+import { loadRegionIndex } from "../regions/service.js";
 
 export const equipmentsRouter = Router();
 
@@ -24,7 +25,18 @@ equipmentsRouter.get("/", async (req, res) => {
     typeId: filters.typeId,
     status: filters.status,
     district: filters.district,
+    agency: filters.agency,
   };
+  if (filters.region) {
+    const index = await loadRegionIndex();
+    const region = index.regions.find((r) => r.code === filters.region);
+    const allDistricts = index.regions.flatMap((r) => index.districtsOf(r.id));
+    where.AND = [
+      filters.region === "SEM_REGIAO"
+        ? { district: { notIn: allDistricts } }
+        : { district: { in: region ? index.districtsOf(region.id) : [] } },
+    ];
+  }
   if (filters.q) {
     where.OR = [
       { serialNumber: { contains: filters.q } },
@@ -38,8 +50,9 @@ equipmentsRouter.get("/", async (req, res) => {
   const equipments = await prisma.equipment.findMany({ where, include: { type: true } });
   const dtos = equipments
     .map(toEquipmentDto)
-    // A urgência é calculada (depende da data atual), por isso o filtro é feito em memória.
+    // Urgência e conectividade são calculadas (dependem da hora atual), por isso o filtro é feito em memória.
     .filter((e) => !filters.urgency || e.urgency === filters.urgency)
+    .filter((e) => !filters.connectivity || e.connectivity === filters.connectivity)
     .sort((a, b) => urgencyPriority(a.urgency) - urgencyPriority(b.urgency));
   res.json(dtos);
 });

@@ -10,6 +10,7 @@ import { metricsRouter } from "./modules/metrics/routes.js";
 import { mapRouter } from "./modules/map/routes.js";
 import { alertsRouter } from "./modules/alerts/routes.js";
 import { telemetryRouter } from "./modules/telemetry/routes.js";
+import { regionsRouter } from "./modules/regions/routes.js";
 
 export function createApp() {
   const app = express();
@@ -27,6 +28,7 @@ export function createApp() {
   app.use("/api/dashboard", dashboardRouter);
   app.use("/api/alerts", alertsRouter);
   app.use("/api/telemetry", telemetryRouter);
+  app.use("/api/regions", regionsRouter);
   app.use("/api/cep", cepRouter);
   app.use("/metrics", metricsRouter);
 

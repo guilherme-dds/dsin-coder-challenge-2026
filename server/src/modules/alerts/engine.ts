@@ -1,19 +1,20 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
 import type { AlertKind, AlertSeverity } from "../../domain/alerts.js";
-import { summarizeAvailability } from "../../domain/availability.js";
+import {
+  REGION_CRITICAL_PCT,
+  REGION_DEGRADED_PCT,
+  REGION_MIN_INSTALLED,
+  summarizeAvailability,
+} from "../../domain/availability.js";
 import { UNSTABLE_WINDOW_MS } from "../../domain/connectivity.js";
 import { findViolations, type TelemetryMetrics } from "../../domain/telemetry.js";
 import { toEquipmentDto } from "../equipments/service.js";
+import { loadRegionIndex } from "../regions/service.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const UPCOMING_WINDOW_DAYS = 7;
 const ENGINE_INTERVAL_MS = 30 * 1000;
-
-/** Abaixo destes percentuais de disponibilidade a região é considerada degradada. */
-const REGION_DEGRADED_PCT = 80;
-const REGION_CRITICAL_PCT = 60;
-const REGION_MIN_INSTALLED = 3;
 
 interface AlertCandidate {
   kind: AlertKind;
@@ -31,17 +32,16 @@ const minutesSince = (date: Date, now: Date) => Math.round((now.getTime() - date
 
 /** Aplica as regras sobre o estado atual da cidade e devolve os alertas que deveriam estar abertos. */
 async function collectCandidates(now: Date): Promise<AlertCandidate[]> {
-  const [equipments, agents, districts, recentReadings] = await Promise.all([
+  const [equipments, agents, { regionOf }, recentReadings] = await Promise.all([
     prisma.equipment.findMany({ include: { type: true } }),
     prisma.agent.findMany({ where: { active: true } }),
-    prisma.district.findMany({ include: { region: true } }),
+    loadRegionIndex(),
     prisma.telemetryReading.findMany({
       where: { receivedAt: { gte: new Date(now.getTime() - UNSTABLE_WINDOW_MS) } },
       orderBy: { receivedAt: "desc" },
       select: { equipmentId: true, metrics: true },
     }),
   ]);
-  const regionOf = new Map(districts.map((d) => [d.name, d.region]));
   // Leitura mais recente de cada dispositivo (a lista vem da mais nova para a mais antiga).
   const latestReading = new Map<string, TelemetryMetrics>();
   for (const r of recentReadings) {
@@ -53,7 +53,7 @@ async function collectCandidates(now: Date): Promise<AlertCandidate[]> {
   for (const e of dtos) {
     const label = `${e.type.name} #${e.serialNumber}`;
     const where = `${e.street}, ${e.reference} · ${e.district}`;
-    const base = { equipmentId: e.id, regionId: regionOf.get(e.district)?.id };
+    const base = { equipmentId: e.id, regionId: regionOf(e.district)?.id };
 
     if (e.status === "FURTADO") {
       candidates.push({ ...base, kind: "FURTO", severity: "CRITICA", title: `${label} furtado`, message: where });
@@ -118,14 +118,14 @@ async function collectCandidates(now: Date): Promise<AlertCandidate[]> {
         ? `Última posição há ${minutesSince(a.lastPositionAt, now)} min · base ${a.baseName}`
         : `Nenhuma posição recebida · base ${a.baseName}`,
       agentId: a.id,
-      regionId: regionOf.get(a.district)?.id,
+      regionId: regionOf(a.district)?.id,
     });
   }
 
   // Regiões com disponibilidade abaixo do aceitável.
   const byRegion = new Map<string, { name: string; items: typeof dtos }>();
   for (const e of dtos) {
-    const region = regionOf.get(e.district);
+    const region = regionOf(e.district);
     if (!region) continue;
     if (!byRegion.has(region.id)) byRegion.set(region.id, { name: region.name, items: [] });
     byRegion.get(region.id)!.items.push(e);
@@ -207,8 +207,12 @@ export function scheduleAlertEvaluation() {
     });
 }
 
-/** Reavalia as regras periodicamente: é assim que a falha silenciosa (equipamento offline) vira alerta. */
-export function startAlertEngine() {
+/**
+ * Reavalia as regras periodicamente: é assim que a falha silenciosa (equipamento offline) vira alerta.
+ * Resolve quando a primeira avaliação termina, para quem depende dos alertas já atualizados.
+ */
+export async function startAlertEngine() {
   scheduleAlertEvaluation();
+  await running;
   return setInterval(scheduleAlertEvaluation, ENGINE_INTERVAL_MS);
 }

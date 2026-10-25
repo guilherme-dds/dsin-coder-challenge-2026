@@ -2,6 +2,7 @@ import { z } from "zod";
 import { EQUIPMENT_STATUSES, MAINTENANCE_TYPES } from "../../domain/status.js";
 import { URGENCY_LEVELS } from "../../domain/urgency.js";
 import { AGENCIES } from "../../domain/agency.js";
+import { CONNECTIVITY_LEVELS } from "../../domain/connectivity.js";
 
 export const equipmentInput = z.object({
   typeId: z.string().min(1),
@@ -50,6 +51,10 @@ export const equipmentFilters = z.object({
   status: z.enum(EQUIPMENT_STATUSES).optional(),
   district: z.string().optional(),
   urgency: z.enum(URGENCY_LEVELS).optional(),
+  agency: z.enum(AGENCIES).optional(),
+  /** Código da região (ex.: CENTRO) ou SEM_REGIAO para bairros fora das regiões cadastradas. */
+  region: z.string().optional(),
+  connectivity: z.enum(CONNECTIVITY_LEVELS).optional(),
 });
 
 export const telemetryFilters = z.object({

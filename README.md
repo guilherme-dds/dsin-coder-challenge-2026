@@ -95,20 +95,28 @@ web/
   estado da cidade: furto, falha reportada, equipamento sem comunicação, manutenção vencida ou próxima, agente sem
   sinal, leitura de telemetria fora dos limites e região com disponibilidade abaixo de 80%. O alerta abre sozinho, muda de gravidade se a situação piorar e
   se resolve sozinho quando a condição deixa de existir; o operador apenas o reconhece.
-- **Pronto para o PROMETHEUS**: `GET /metrics` expõe o inventário e os alertas abertos no formato de exposição do Prometheus.
+- **Disponibilidade real**: conta os equipamentos instalados que estão operando _e_ comunicando. Um equipamento
+  "operacional" que parou de enviar telemetria conta como indisponível, mesmo que ninguém tenha registrado a falha.
+- **Visão por região**: os bairros são agrupados em regiões, e cada região recebe um nível de saúde: _crítico_ (alerta
+  crítico aberto ou disponibilidade abaixo de 60%), _atenção_ (alerta de gravidade alta ou disponibilidade abaixo de
+  80%) ou _normal_. A disponibilidade da cidade e de cada região é registrada a cada 15 min para o gráfico histórico.
+- **Pronto para o PROMETHEUS**: `GET /metrics` expõe o inventário, os alertas abertos e a disponibilidade por região
+  no formato de exposição do Prometheus.
 - **Cadastro assistido**: CEP preenche o endereço (ViaCEP); coordenadas vêm do clique no mapa ou do GPS do dispositivo.
 
 ## API
 
 | Método | Rota                              | Descrição                                   |
 | ------ | --------------------------------- | ------------------------------------------- |
-| GET    | `/api/map`                        | Equipamentos, agentes e pontos de calor     |
-| GET    | `/api/dashboard`                  | Indicadores por urgência, situação e tipo   |
+| GET    | `/api/map`                        | Equipamentos, agentes (com a região de cada um), regiões e pontos de calor |
+| GET    | `/api/dashboard`                  | Disponibilidade, agentes em atividade, alertas, conectividade e composição da rede |
+| GET    | `/api/regions`                    | Visão consolidada por região, das que exigem atenção para as normais |
+| GET    | `/api/regions/history`            | Histórico de disponibilidade (`regionId` opcional; sem ele, a cidade) por `hours` (padrão 24) |
 | GET    | `/api/alerts`                     | Alertas, mais graves primeiro. Filtros: `status` (padrão `ABERTO,RECONHECIDO`), `severity`, `regionId` |
 | POST   | `/api/alerts/:id/acknowledge`     | Reconhece um alerta aberto (`by` opcional)  |
 | GET    | `/api/equipment-types`            | Tipos e seus atributos                      |
 | POST   | `/api/equipment-types`            | Cria tipo (com `attributesSchema`)          |
-| GET    | `/api/equipments`                 | Filtros: `q`, `typeId`, `status`, `district`, `urgency` |
+| GET    | `/api/equipments`                 | Filtros: `q`, `typeId`, `status`, `district`, `region` (código), `agency`, `urgency`, `connectivity` |
 | GET    | `/api/equipments/:id`             | Ficha (eventos + transições possíveis)      |
 | POST   | `/api/equipments`                 | Cadastra equipamento                        |
 | PUT    | `/api/equipments/:id`             | Atualiza dados (exceto situação)            |
@@ -116,7 +124,7 @@ web/
 | POST   | `/api/equipments/:id/maintenance` | Agenda manutenção                           |
 | GET    | `/api/equipments/:id/telemetry`   | Leituras mais recentes (`limit`, padrão 50) |
 | POST   | `/api/telemetry`                  | Ingestão de telemetria: `{ serialNumber, metrics, receivedAt? }` ou um lote (até 500) |
-| GET    | `/api/agents`                     | Filtros: `role`, `active`, `q`              |
+| GET    | `/api/agents`                     | Filtros: `role`, `active`, `fieldStatus`, `q` |
 | POST   | `/api/agents`                     | Cadastra agente (com posição no mapa)       |
 | PUT    | `/api/agents/:id`                 | Atualiza agente                             |
 | POST   | `/api/agents/:id/position`        | Posição do agente: `{ latitude, longitude, fieldStatus?, recordedAt? }` |

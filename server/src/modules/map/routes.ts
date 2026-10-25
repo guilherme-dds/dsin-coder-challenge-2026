@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { FAILURE_STATUSES } from "../../domain/urgency.js";
 import { toEquipmentDto } from "../equipments/service.js";
+import { loadRegionIndex } from "../regions/service.js";
 
 export const mapRouter = Router();
 
@@ -10,7 +11,7 @@ export const mapRouter = Router();
  * equipamentos, agentes posicionados e os pontos da camada de calor de falhas.
  */
 mapRouter.get("/", async (_req, res) => {
-  const [equipments, agents, failureEvents] = await Promise.all([
+  const [equipments, agents, failureEvents, index] = await Promise.all([
     prisma.equipment.findMany({ include: { type: true } }),
     prisma.agent.findMany({
       where: { latitude: { not: null }, longitude: { not: null } },
@@ -22,6 +23,7 @@ mapRouter.get("/", async (_req, res) => {
       where: { kind: "STATUS_ALTERADO", toStatus: { in: FAILURE_STATUSES } },
       _count: { _all: true },
     }),
+    loadRegionIndex(),
   ]);
 
   const failuresByEquipment = new Map(failureEvents.map((f) => [f.equipmentId, f._count._all]));
@@ -35,5 +37,13 @@ mapRouter.get("/", async (_req, res) => {
     }))
     .filter((p) => p.weight > 0);
 
-  res.json({ equipments: equipments.map(toEquipmentDto), agents, failures });
+  // Código da região em cada ponto, para o filtro por região no mapa.
+  const regionCode = (district: string) => index.regionOf(district)?.code ?? "SEM_REGIAO";
+
+  res.json({
+    equipments: equipments.map((e) => ({ ...toEquipmentDto(e), regionCode: regionCode(e.district) })),
+    agents: agents.map((a) => ({ ...a, regionCode: regionCode(a.district) })),
+    regions: index.regions,
+    failures,
+  });
 });

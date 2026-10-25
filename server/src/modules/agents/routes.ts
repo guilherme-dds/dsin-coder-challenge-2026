@@ -39,6 +39,7 @@ const trailFilters = z.object({ minutes: z.coerce.number().int().positive().max(
 const agentFilters = z.object({
   role: z.enum(AGENT_ROLES).optional(),
   active: z.enum(["true", "false"]).optional(),
+  fieldStatus: z.enum(AGENT_FIELD_STATUSES).optional(),
   q: z.string().optional(),
 });
 
@@ -50,6 +51,7 @@ agentsRouter.get("/", async (req, res) => {
     where: {
       role: filters.role,
       active: filters.active === undefined ? undefined : filters.active === "true",
+      fieldStatus: filters.fieldStatus,
       OR: filters.q ? [{ name: { contains: filters.q } }, { registration: { contains: filters.q } }] : undefined,
     },
     orderBy: { name: "asc" },
