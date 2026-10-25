@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import type { AttributeField } from "../src/domain/dynamic-attributes.js";
+import { sampleMetrics } from "../src/domain/telemetry.js";
 
 const prisma = new PrismaClient();
 
@@ -251,26 +252,6 @@ function agencyFor(type: string, attributes: Record<string, unknown>) {
   return "TRANSITO";
 }
 
-/** Medições típicas de cada tipo de dispositivo, usadas nas leituras de telemetria. */
-function metricsFor(type: string): Record<string, number> {
-  switch (type) {
-    case "RADAR":
-      return { veiculosHora: 200 + Math.floor(random() * 600), velocidadeMedia: 35 + Math.floor(random() * 20), infracoesHora: Math.floor(random() * 12) };
-    case "CAMERA":
-      return { fps: 24 + Math.floor(random() * 7), bitrateKbps: 2500 + Math.floor(random() * 3000) };
-    case "BALANCA":
-      return { pesagensHora: 20 + Math.floor(random() * 60), excessosHora: Math.floor(random() * 5) };
-    case "TOTEM_ESTACIONAMENTO":
-      return { transacoesHora: Math.floor(random() * 40), papelPct: 20 + Math.floor(random() * 80) };
-    case "CANCELA":
-      return { aberturasHora: Math.floor(random() * 120) };
-    case "PATINETE":
-      return { bateriaPct: 15 + Math.floor(random() * 85) };
-    default:
-      return { velocidade: Math.floor(random() * 60), ignicao: random() > 0.3 ? 1 : 0 };
-  }
-}
-
 const FIELD_STATUS_BY_AGENT: Record<string, string> = {
   "AT-1021": "EM_ATENDIMENTO",
   "AT-1045": "DISPONIVEL",
@@ -453,7 +434,7 @@ async function main() {
     const lastSeenAt = lastSeenFor(e.status);
     const readings = lastSeenAt
       ? [0, 60, 120].map((offset) => ({
-          metrics: JSON.stringify(metricsFor(type)),
+          metrics: JSON.stringify(sampleMetrics(type, random)),
           receivedAt: new Date(lastSeenAt.getTime() - offset * 1000),
         }))
       : [];

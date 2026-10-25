@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma.js";
 import type { AlertKind, AlertSeverity } from "../../domain/alerts.js";
 import { summarizeAvailability } from "../../domain/availability.js";
 import { UNSTABLE_WINDOW_MS } from "../../domain/connectivity.js";
+import { findViolations, type TelemetryMetrics } from "../../domain/telemetry.js";
 import { toEquipmentDto } from "../equipments/service.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -30,12 +31,22 @@ const minutesSince = (date: Date, now: Date) => Math.round((now.getTime() - date
 
 /** Aplica as regras sobre o estado atual da cidade e devolve os alertas que deveriam estar abertos. */
 async function collectCandidates(now: Date): Promise<AlertCandidate[]> {
-  const [equipments, agents, districts] = await Promise.all([
+  const [equipments, agents, districts, recentReadings] = await Promise.all([
     prisma.equipment.findMany({ include: { type: true } }),
     prisma.agent.findMany({ where: { active: true } }),
     prisma.district.findMany({ include: { region: true } }),
+    prisma.telemetryReading.findMany({
+      where: { receivedAt: { gte: new Date(now.getTime() - UNSTABLE_WINDOW_MS) } },
+      orderBy: { receivedAt: "desc" },
+      select: { equipmentId: true, metrics: true },
+    }),
   ]);
   const regionOf = new Map(districts.map((d) => [d.name, d.region]));
+  // Leitura mais recente de cada dispositivo (a lista vem da mais nova para a mais antiga).
+  const latestReading = new Map<string, TelemetryMetrics>();
+  for (const r of recentReadings) {
+    if (!latestReading.has(r.equipmentId)) latestReading.set(r.equipmentId, JSON.parse(r.metrics));
+  }
   const dtos = equipments.map(toEquipmentDto);
   const candidates: AlertCandidate[] = [];
 
@@ -59,6 +70,17 @@ async function collectCandidates(now: Date): Promise<AlertCandidate[]> {
         severity: "ALTA",
         title: `${label} sem comunicação`,
         message: `Sem telemetria há ${minutesSince(e.lastSeenAt!, now)} min · ${where}`,
+      });
+    }
+    // Comunicando, mas com medições fora do esperado: o problema que só a telemetria revela.
+    const violations = e.status === "OPERACIONAL" ? findViolations(latestReading.get(e.id) ?? {}) : [];
+    if (violations.length) {
+      candidates.push({
+        ...base,
+        kind: "LEITURA_ANOMALA",
+        severity: "MEDIA",
+        title: `Leitura anômala: ${label}`,
+        message: `${violations.map((v) => `${v.label} ${v.value} (mín. ${v.min})`).join(", ")} · ${where}`,
       });
     }
     if (e.urgency === "INATIVO" || e.urgency === "PENDENTE" || !e.nextMaintenanceAt) continue;

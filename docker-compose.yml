@@ -26,5 +26,23 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Faz o papel dos dispositivos IoT e das equipes em campo. Para desligar: docker compose stop simulator
+  simulator:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    # Sem o entrypoint do servidor: quem aplica migrations e seed é só o serviço "server".
+    entrypoint: ["npx", "tsx", "scripts/simulate.ts"]
+    command: []
+    environment:
+      API_URL: http://server:3333
+    # O HEALTHCHECK da imagem verifica a API, que não roda neste container.
+    healthcheck:
+      disable: true
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   db-data:

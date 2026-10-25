@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { notFound } from "../../lib/http-error.js";
 import { AGENT_FIELD_STATUSES } from "../../domain/field-status.js";
+import { scheduleAlertEvaluation } from "../alerts/engine.js";
 
 export const AGENT_ROLES = ["AGENTE_TRANSITO", "GUARDA_MUNICIPAL", "POLICIAL_MILITAR"] as const;
 export const SHIFTS = ["MANHA", "TARDE", "NOITE", "MADRUGADA"] as const;
@@ -24,6 +25,16 @@ const agentInput = z.object({
   active: z.boolean().default(true),
   fieldStatus: z.enum(AGENT_FIELD_STATUSES).optional(),
 });
+
+/** Posição (e, opcionalmente, situação) reportada pelo dispositivo da equipe em campo. */
+const positionInput = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  fieldStatus: z.enum(AGENT_FIELD_STATUSES).optional(),
+  recordedAt: z.coerce.date().optional(),
+});
+
+const trailFilters = z.object({ minutes: z.coerce.number().int().positive().max(24 * 60).default(30) });
 
 const agentFilters = z.object({
   role: z.enum(AGENT_ROLES).optional(),
@@ -67,4 +78,35 @@ agentsRouter.post("/", async (req, res) => {
 agentsRouter.put("/:id", async (req, res) => {
   const agent = await prisma.agent.update({ where: { id: req.params.id }, data: agentInput.parse(req.body) });
   res.json(agent);
+});
+
+agentsRouter.post("/:id/position", async (req, res) => {
+  const { latitude, longitude, fieldStatus, recordedAt = new Date() } = positionInput.parse(req.body);
+  const agent = await prisma.agent.findUnique({ where: { id: req.params.id } });
+  if (!agent) throw notFound("Agente");
+
+  // Uma posição atrasada entra na trilha, mas não substitui a posição atual do agente.
+  const isLatest = !agent.lastPositionAt || recordedAt >= agent.lastPositionAt;
+  const updated = await prisma.agent.update({
+    where: { id: agent.id },
+    data: {
+      positions: { create: { latitude, longitude, recordedAt } },
+      ...(isLatest && { latitude, longitude, lastPositionAt: recordedAt }),
+      // Receber posição prova que há sinal: sai de SEM_SINAL mesmo sem informar a situação.
+      fieldStatus: fieldStatus ?? (agent.fieldStatus === "SEM_SINAL" ? "DISPONIVEL" : undefined),
+    },
+  });
+  scheduleAlertEvaluation();
+  res.status(202).json(updated);
+});
+
+/** Trilha recente do agente, da posição mais antiga para a mais nova. */
+agentsRouter.get("/:id/positions", async (req, res) => {
+  const { minutes } = trailFilters.parse(req.query);
+  const positions = await prisma.agentPosition.findMany({
+    where: { agentId: req.params.id, recordedAt: { gte: new Date(Date.now() - minutes * 60 * 1000) } },
+    orderBy: { recordedAt: "asc" },
+    select: { latitude: true, longitude: true, recordedAt: true },
+  });
+  res.json(positions);
 });

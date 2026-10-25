@@ -19,10 +19,19 @@ sua situação e se cadastra um novo equipamento clicando no local de instalaç�
 
 ```bash
 npm run setup   # instala dependências, cria o banco e popula com dados de exemplo (Marília/SP)
-npm run dev     # API em http://localhost:3333 e web em http://localhost:5173
+npm run dev     # API em http://localhost:3333, web em http://localhost:5173 e o simulador da cidade
 ```
 
 Outros comandos úteis (rodar dentro de `server/` ou com `-w server`): `db:reset`, `db:seed`, `db:studio`.
+
+### Simulador da cidade
+
+`npm run simulate` faz o papel dos dispositivos IoT e das equipes em campo, enviando telemetria e posições pelos
+mesmos endpoints que o PROMETHEUS usaria (já roda junto com `npm run dev`). De tempos em tempos provoca incidentes:
+dispositivo que para de responder, leitura anômala (câmera sem imagem, totem sem papel, patinete sem bateria) e
+agente sem sinal. Três dispositivos ficam permanentemente mudos, para a falha silenciosa estar sempre visível.
+Variáveis opcionais: `API_URL` (padrão `http://localhost:3333`), `TICK_MS` (padrão `10000`) e `INCIDENT_CHANCE`
+(chance de incidente por ciclo, padrão `0.04`).
 
 ### Com Docker
 
@@ -33,6 +42,7 @@ docker compose up -d --build   # web em http://localhost:8080 e API em http://lo
 - **server**: aplica as migrations na inicialização e, quando o banco ainda não existe, roda o seed. O SQLite fica
   no volume `db-data`, então os dados sobrevivem a restarts e rebuilds.
 - **web**: build estático do Vite servido pelo nginx, que encaminha `/api` e `/metrics` para o `server`.
+- **simulator**: o simulador da cidade, apontando para o `server`. Para desligar: `docker compose stop simulator`.
 - Variáveis opcionais: `WEB_PORT` (padrão `8080`), `API_PORT` (padrão `3333`) e `SEED_ON_START=true` para
   recriar os dados de exemplo ao subir.
 - Recomeçar do zero: `docker compose down -v` (apaga o volume do banco).
@@ -83,7 +93,7 @@ web/
   alimenta a camada de calor de falhas.
 - **Motor de alertas**: a cada 30 s (e logo após cada mudança feita pelo operador) as regras são reavaliadas sobre o
   estado da cidade: furto, falha reportada, equipamento sem comunicação, manutenção vencida ou próxima, agente sem
-  sinal e região com disponibilidade abaixo de 80%. O alerta abre sozinho, muda de gravidade se a situação piorar e
+  sinal, leitura de telemetria fora dos limites e região com disponibilidade abaixo de 80%. O alerta abre sozinho, muda de gravidade se a situação piorar e
   se resolve sozinho quando a condição deixa de existir; o operador apenas o reconhece.
 - **Pronto para o PROMETHEUS**: `GET /metrics` expõe o inventário e os alertas abertos no formato de exposição do Prometheus.
 - **Cadastro assistido**: CEP preenche o endereço (ViaCEP); coordenadas vêm do clique no mapa ou do GPS do dispositivo.
@@ -104,8 +114,12 @@ web/
 | PUT    | `/api/equipments/:id`             | Atualiza dados (exceto situação)            |
 | POST   | `/api/equipments/:id/status`      | Altera situação (máquina de estados)        |
 | POST   | `/api/equipments/:id/maintenance` | Agenda manutenção                           |
+| GET    | `/api/equipments/:id/telemetry`   | Leituras mais recentes (`limit`, padrão 50) |
+| POST   | `/api/telemetry`                  | Ingestão de telemetria: `{ serialNumber, metrics, receivedAt? }` ou um lote (até 500) |
 | GET    | `/api/agents`                     | Filtros: `role`, `active`, `q`              |
 | POST   | `/api/agents`                     | Cadastra agente (com posição no mapa)       |
 | PUT    | `/api/agents/:id`                 | Atualiza agente                             |
+| POST   | `/api/agents/:id/position`        | Posição do agente: `{ latitude, longitude, fieldStatus?, recordedAt? }` |
+| GET    | `/api/agents/:id/positions`       | Trilha recente (`minutes`, padrão 30)       |
 | GET    | `/api/cep/:cep`                   | Consulta endereço no ViaCEP                 |
 | GET    | `/metrics`                        | Métricas no formato Prometheus              |

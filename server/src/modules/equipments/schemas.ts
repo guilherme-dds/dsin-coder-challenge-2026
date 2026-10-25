@@ -51,3 +51,7 @@ export const equipmentFilters = z.object({
   district: z.string().optional(),
   urgency: z.enum(URGENCY_LEVELS).optional(),
 });
+
+export const telemetryFilters = z.object({
+  limit: z.coerce.number().int().positive().max(500).default(50),
+});

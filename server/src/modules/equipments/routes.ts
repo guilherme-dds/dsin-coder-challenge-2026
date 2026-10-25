@@ -10,7 +10,9 @@ import {
   equipmentUpdateInput,
   scheduleMaintenanceInput,
   statusChangeInput,
+  telemetryFilters,
 } from "./schemas.js";
+import type { TelemetryMetrics } from "../../domain/telemetry.js";
 import { changeStatus, toEquipmentDto, validateAttributes } from "./service.js";
 import { scheduleAlertEvaluation } from "../alerts/engine.js";
 
@@ -60,6 +62,17 @@ equipmentsRouter.get("/:id", async (req, res) => {
     events,
     allowedTransitions: STATUS_TRANSITIONS[equipment.status as EquipmentStatus],
   });
+});
+
+/** Leituras mais recentes do dispositivo, da mais nova para a mais antiga. */
+equipmentsRouter.get("/:id/telemetry", async (req, res) => {
+  const { limit } = telemetryFilters.parse(req.query);
+  const readings = await prisma.telemetryReading.findMany({
+    where: { equipmentId: req.params.id },
+    orderBy: { receivedAt: "desc" },
+    take: limit,
+  });
+  res.json(readings.map((r) => ({ receivedAt: r.receivedAt, metrics: JSON.parse(r.metrics) as TelemetryMetrics })));
 });
 
 equipmentsRouter.post("/", async (req, res) => {

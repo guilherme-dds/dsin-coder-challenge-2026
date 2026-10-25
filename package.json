@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "setup": "npm install && npm run db:setup -w server",
-    "dev": "concurrently -n api,web -c red,cyan \"npm run dev -w server\" \"npm run dev -w web\"",
+    "dev": "concurrently -n api,web,sim -c red,cyan,gray \"npm run dev -w server\" \"npm run dev -w web\" \"npm run simulate -w server\"",
+    "simulate": "npm run simulate -w server",
     "build": "npm run build -w server && npm run build -w web",
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
   },
