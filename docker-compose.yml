@@ -1,0 +1,30 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      DATABASE_URL: file:/data/fogo.db
+      PORT: 3333
+      SEED_ON_START: ${SEED_ON_START:-false}
+    volumes:
+      - db-data:/data
+    ports:
+      - "${API_PORT:-3333}:3333"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    environment:
+      API_URL: http://server:3333
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:

@@ -24,6 +24,19 @@ npm run dev     # API em http://localhost:3333 e web em http://localhost:5173
 
 Outros comandos úteis (rodar dentro de `server/` ou com `-w server`): `db:reset`, `db:seed`, `db:studio`.
 
+### Com Docker
+
+```bash
+docker compose up -d --build   # web em http://localhost:8080 e API em http://localhost:3333
+```
+
+- **server**: aplica as migrations na inicialização e, quando o banco ainda não existe, roda o seed. O SQLite fica
+  no volume `db-data`, então os dados sobrevivem a restarts e rebuilds.
+- **web**: build estático do Vite servido pelo nginx, que encaminha `/api` e `/metrics` para o `server`.
+- Variáveis opcionais: `WEB_PORT` (padrão `8080`), `API_PORT` (padrão `3333`) e `SEED_ON_START=true` para
+  recriar os dados de exemplo ao subir.
+- Recomeçar do zero: `docker compose down -v` (apaga o volume do banco).
+
 ## Mapa operacional
 
 - **Ícone por categoria**: radar, câmera, balança, cancela, totem, patinete, viatura, moto, transporte etc.

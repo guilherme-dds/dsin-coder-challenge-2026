@@ -1,0 +1,37 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Resolve o host da API a cada requisição (DNS interno do Docker), para não
+    # ficar preso ao IP antigo quando o container do servidor é recriado.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $api_upstream ${API_URL};
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    location /api/ {
+        proxy_pass $api_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /metrics {
+        proxy_pass $api_upstream;
+        proxy_set_header Host $host;
+    }
+
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # SPA (react-router): rotas desconhecidas caem no index.html.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
