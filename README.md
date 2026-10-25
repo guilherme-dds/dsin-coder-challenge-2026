@@ -51,11 +51,22 @@ docker compose up -d --build   # web em http://localhost:8080 e API em http://lo
 
 - **Ícone por categoria**: radar, câmera, balança, cancela, totem, patinete, viatura, moto, transporte etc.
   Agentes aparecem como pinos quadrados, com o ícone da sua função.
-- **Cor pelo estado operacional**: Crítico, Alerta, Atenção, Normal, Pendente e Inativo. Os críticos pulsam.
-- **Filtros** por bairro, tipo, urgência, situação e busca textual (série, rua, referência).
+- **Ao vivo**: mapa, alertas e fichas se atualizam sozinhos a cada 10 s; o topo mostra há quanto tempo foi a última
+  atualização (ou que a API está fora do ar).
+- **Cor por urgência ou por situação**, à escolha do operador. Por urgência: Crítico, Alerta, Atenção, Normal,
+  Pendente e Inativo, com os críticos pulsando. Por situação: operacional, mau funcionamento, em manutenção,
+  desativado, furtado, não instalado e baixado, cada um com sua cor.
+- **Sem comunicação à vista**: equipamento sem telemetria há mais de 10 min (ou agente sem sinal) ganha uma marca
+  vermelha no canto do pino; agentes em pausa aparecem esmaecidos.
+- **Painel de alertas**: fila dos alertas abertos, dos mais graves para os mais leves, com filtro por gravidade.
+  Alertas novos piscam ao chegar e o botão de alertas pulsa enquanto houver alerta crítico não reconhecido. Clicar
+  no alerta leva ao equipamento ou agente (ou enquadra a região); o operador pode reconhecê-lo ali mesmo.
+- **Filtros** por região, bairro, órgão responsável (vale também para os agentes), situação, comunicação, tipo,
+  urgência e busca textual (série, rua, referência).
 - **Camadas** independentes: equipamentos, agentes e **calor de falhas**, que mostra as regiões com maior
   concentração de falhas a partir do histórico de eventos e das falhas ativas.
-- **Ficha lateral** ao clicar em um ponto, com ação rápida de mudança de situação e atalhos para a ficha completa.
+- **Ficha lateral** ao clicar em um ponto: situação, comunicação e último contato, órgão, características, última
+  leitura de telemetria e ação rápida de mudança de situação. Para agentes, situação em campo e última posição.
 - **Cadastrar no mapa**: clique no local e o formulário abre com as coordenadas preenchidas.
 
 ## Estrutura

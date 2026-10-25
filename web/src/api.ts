@@ -1,5 +1,6 @@
 import type {
   Agent,
+  Alert,
   Dashboard,
   Equipment,
   EquipmentRecord,
@@ -7,6 +8,8 @@ import type {
   EquipmentType,
   Location,
   OperationsMapData,
+  RegionOverview,
+  TelemetryReading,
 } from "./types";
 
 export class ApiError extends Error {
@@ -36,22 +39,29 @@ const query = (params: Record<string, string | undefined>) => {
   return search.size ? `?${search}` : "";
 };
 
+// Campos calculados ou reportados pelos dispositivos não fazem parte do cadastro.
 export type EquipmentPayload = Omit<
   Equipment,
-  "id" | "type" | "urgency" | "createdAt" | "updatedAt"
+  "id" | "type" | "urgency" | "connectivity" | "lastSeenAt" | "createdAt" | "updatedAt"
 >;
 
-export type AgentPayload = Omit<Agent, "id" | "_count">;
+export type AgentPayload = Omit<Agent, "id" | "_count" | "fieldStatus" | "lastPositionAt">;
 
 export const api = {
   dashboard: () => request<Dashboard>("/dashboard"),
   operationsMap: () => request<OperationsMapData>("/map"),
+
+  regions: () => request<RegionOverview[]>("/regions"),
+
+  alerts: () => request<Alert[]>("/alerts"),
+  acknowledgeAlert: (id: string) => request<Alert>(`/alerts/${id}/acknowledge`, json("POST", {})),
 
   equipmentTypes: () => request<EquipmentType[]>("/equipment-types"),
 
   equipments: (filters: Record<string, string | undefined> = {}) =>
     request<Equipment[]>(`/equipments${query(filters)}`),
   equipment: (id: string) => request<EquipmentRecord>(`/equipments/${id}`),
+  telemetry: (id: string, limit = 10) => request<TelemetryReading[]>(`/equipments/${id}/telemetry?limit=${limit}`),
   createEquipment: (data: EquipmentPayload) => request<Equipment>("/equipments", json("POST", data)),
   updateEquipment: (id: string, data: EquipmentPayload) => request<Equipment>(`/equipments/${id}`, json("PUT", data)),
   changeStatus: (id: string, data: { status: EquipmentStatus; note?: string; agentId?: string | null }) =>

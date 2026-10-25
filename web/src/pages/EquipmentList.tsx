@@ -2,10 +2,10 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Plus, Search } from "lucide-react";
 import { api } from "../api";
 import { useAsync } from "../hooks";
-import { STATUS_LABELS, URGENCY, formatDate, maintenanceDue } from "../labels";
-import { StatusBadge, UrgencyBadge } from "../components/Badges";
+import { AGENCY_LABELS, CONNECTIVITY, STATUS_LABELS, URGENCY, formatDate, maintenanceDue } from "../labels";
+import { ConnectivityBadge, StatusBadge, UrgencyBadge } from "../components/Badges";
 import { TypeIcon } from "../components/TypeIcon";
-import type { EquipmentStatus, UrgencyLevel } from "../types";
+import type { Agency, Connectivity, EquipmentStatus, UrgencyLevel } from "../types";
 
 export function EquipmentList() {
   const [params, setParams] = useSearchParams();
@@ -13,6 +13,7 @@ export function EquipmentList() {
   const filters = Object.fromEntries(params);
 
   const types = useAsync(api.equipmentTypes);
+  const regions = useAsync(api.regions);
   const { data, error, loading } = useAsync(() => api.equipments(filters), [params.toString()]);
 
   const setFilter = (key: string, value: string) => {
@@ -64,6 +65,30 @@ export function EquipmentList() {
             </option>
           ))}
         </select>
+        <select value={filters.region ?? ""} onChange={(e) => setFilter("region", e.target.value)}>
+          <option value="">Todas as regiões</option>
+          {regions.data?.map((r) => (
+            <option key={r.code} value={r.code}>
+              {r.name}
+            </option>
+          ))}
+        </select>
+        <select value={filters.agency ?? ""} onChange={(e) => setFilter("agency", e.target.value)}>
+          <option value="">Todos os órgãos</option>
+          {(Object.keys(AGENCY_LABELS) as Agency[]).map((a) => (
+            <option key={a} value={a}>
+              {AGENCY_LABELS[a]}
+            </option>
+          ))}
+        </select>
+        <select value={filters.connectivity ?? ""} onChange={(e) => setFilter("connectivity", e.target.value)}>
+          <option value="">Toda comunicação</option>
+          {(Object.keys(CONNECTIVITY) as Connectivity[]).map((c) => (
+            <option key={c} value={c}>
+              {CONNECTIVITY[c].label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {error && <p className="error">{error}</p>}
@@ -107,7 +132,10 @@ export function EquipmentList() {
                   </div>
                 </td>
                 <td>
-                  <StatusBadge status={e.status} />
+                  <div className="cell-badges">
+                    <StatusBadge status={e.status} />
+                    {e.connectivity !== "SEM_TELEMETRIA" && <ConnectivityBadge connectivity={e.connectivity} />}
+                  </div>
                 </td>
                 <td>
                   <span className="mono">{formatDate(e.nextMaintenanceAt)}</span>

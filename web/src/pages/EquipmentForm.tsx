@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, ApiError, type EquipmentPayload } from "../api";
 import { useAsync } from "../hooks";
-import { MAINTENANCE_LABELS, STATUS_LABELS, URGENCY } from "../labels";
+import { AGENCY_LABELS, MAINTENANCE_LABELS, STATUS_LABELS, URGENCY } from "../labels";
 import { DynamicFields } from "../components/DynamicFields";
 import { CityMap, DEFAULT_CENTER } from "../components/CityMap";
 import { SectionHeader } from "../components/SectionHeader";
 import { CalendarClock, FileBadge, LocateFixed, MapPin, MousePointerClick, Search, SlidersHorizontal } from "lucide-react";
-import type { EquipmentStatus, MaintenanceType } from "../types";
+import type { Agency, EquipmentStatus, MaintenanceType } from "../types";
 
 const empty: EquipmentPayload = {
   typeId: "",
@@ -15,6 +15,7 @@ const empty: EquipmentPayload = {
   brand: "",
   model: "",
   status: "NAO_INSTALADO",
+  agency: "TRANSITO",
   zipCode: "",
   street: "",
   reference: "",
@@ -49,7 +50,7 @@ export function EquipmentForm() {
 
   useEffect(() => {
     if (!id) return;
-    api.equipment(id).then(({ type: _t, urgency: _u, events: _e, allowedTransitions: _a, responsibleAgent: _r, ...rest }) =>
+    api.equipment(id).then(({ type: _t, urgency: _u, connectivity: _c, lastSeenAt: _l, events: _e, allowedTransitions: _a, responsibleAgent: _r, ...rest }) =>
       setForm({ ...rest, nextMaintenanceAt: rest.nextMaintenanceAt?.slice(0, 10) ?? null }),
     );
   }, [id]);
@@ -144,6 +145,16 @@ export function EquipmentForm() {
           <label className="field">
             <span>Modelo *</span>
             <input required value={form.model} onChange={(e) => set("model", e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Órgão responsável *</span>
+            <select required value={form.agency} onChange={(e) => set("agency", e.target.value as Agency)}>
+              {(Object.keys(AGENCY_LABELS) as Agency[]).map((a) => (
+                <option key={a} value={a}>
+                  {AGENCY_LABELS[a]}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
       </section>

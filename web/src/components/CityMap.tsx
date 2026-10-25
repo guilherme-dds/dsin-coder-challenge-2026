@@ -19,6 +19,10 @@ export interface MapMarker {
   /** Cor do estado (hex: o Leaflet não resolve variáveis CSS). */
   color: string;
   pulse?: boolean;
+  /** Sem comunicação (equipamento) ou sem sinal (agente): ganha uma marca no canto do pino. */
+  silent?: boolean;
+  /** Fora de atividade (ex.: agente em pausa): pino esmaecido. */
+  dimmed?: boolean;
   title: string;
   subtitle?: string;
   caption?: string;
@@ -31,7 +35,8 @@ interface Props {
   zoom?: number;
   heat?: FailurePoint[];
   selectedId?: string | null;
-  focus?: [number, number] | null;
+  /** Ponto para onde o mapa voa; o terceiro valor, opcional, fixa o zoom (ex.: enquadrar uma região). */
+  focus?: [number, number] | [number, number, number] | null;
   picking?: boolean;
   onMarkerClick?: (marker: MapMarker) => void;
   onMapClick?: (lat: number, lng: number) => void;
@@ -42,15 +47,18 @@ interface Props {
 const iconCache = new Map<string, L.DivIcon>();
 
 function pinIcon(marker: MapMarker, selected: boolean) {
-  const key = `${marker.kind}|${marker.icon}|${marker.color}|${marker.pulse}|${selected}`;
+  const key = `${marker.kind}|${marker.icon}|${marker.color}|${marker.pulse}|${marker.silent}|${marker.dimmed}|${selected}`;
   let icon = iconCache.get(key);
   if (!icon) {
-    const classes = ["map-pin", `map-pin-${marker.kind}`, marker.pulse && "pulse", selected && "selected"].filter(Boolean).join(" ");
+    const classes = ["map-pin", `map-pin-${marker.kind}`, marker.pulse && "pulse", marker.dimmed && "dimmed", selected && "selected"]
+      .filter(Boolean)
+      .join(" ");
+    const flag = marker.silent ? `<span class="pin-flag" title="Sem comunicação"></span>` : "";
     icon = L.divIcon({
       className: "",
       iconSize: [34, 34],
       iconAnchor: [17, 17],
-      html: `<div class="${classes}" style="--pin-color:${marker.color}">${renderToStaticMarkup(<TypeIcon code={marker.icon} size={16} />)}</div>`,
+      html: `<div class="${classes}" style="--pin-color:${marker.color}">${renderToStaticMarkup(<TypeIcon code={marker.icon} size={16} />)}${flag}</div>`,
     });
     iconCache.set(key, icon);
   }
@@ -62,10 +70,11 @@ function ClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) =
   return null;
 }
 
-function FlyTo({ focus }: { focus: [number, number] }) {
+function FlyTo({ focus }: { focus: [number, number] | [number, number, number] }) {
   const map = useMap();
   useEffect(() => {
-    map.flyTo(focus, Math.max(map.getZoom(), 16), { duration: 0.8 });
+    const [lat, lng, zoom] = focus;
+    map.flyTo([lat, lng], zoom ?? Math.max(map.getZoom(), 16), { duration: 0.8 });
   }, [map, focus]);
   return null;
 }

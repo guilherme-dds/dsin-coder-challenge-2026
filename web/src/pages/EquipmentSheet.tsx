@@ -4,6 +4,7 @@ import { CalendarClock, ClipboardPen, History, MapPin, Pencil, Stethoscope, User
 import { api } from "../api";
 import { useAsync } from "../hooks";
 import {
+  AGENCY_LABELS,
   EVENT_LABELS,
   MAINTENANCE_LABELS,
   STATUS_LABELS,
@@ -11,8 +12,9 @@ import {
   formatDate,
   formatDateTime,
   maintenanceDue,
+  timeAgo,
 } from "../labels";
-import { StatusBadge, UrgencyBadge } from "../components/Badges";
+import { ConnectivityBadge, StatusBadge, UrgencyBadge } from "../components/Badges";
 import { formatAttribute } from "../components/DynamicFields";
 import { CityMap } from "../components/CityMap";
 import { TypeIcon } from "../components/TypeIcon";
@@ -67,7 +69,10 @@ export function EquipmentSheet() {
               <span className="chip">#{eq.serialNumber}</span>
               <UrgencyBadge level={eq.urgency} />
               <StatusBadge status={eq.status} />
+              <ConnectivityBadge connectivity={eq.connectivity} />
+              <span className="chip">{AGENCY_LABELS[eq.agency]}</span>
             </div>
+            {eq.lastSeenAt && <p className="muted">Último contato do dispositivo: {timeAgo(eq.lastSeenAt)}</p>}
           </div>
         </div>
         <Link to={`/equipamentos/${eq.id}/editar`} className="button">

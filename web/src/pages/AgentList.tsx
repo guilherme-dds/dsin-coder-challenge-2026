@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Plus } from "lucide-react";
 import { api } from "../api";
 import { useAsync } from "../hooks";
-import { ROLE_LABELS, SHIFT_LABELS, initials } from "../labels";
+import { ROLE_LABELS, SHIFT_LABELS, initials, timeAgo } from "../labels";
+import { FieldStatusBadge } from "../components/Badges";
 import type { AgentRole } from "../types";
 
 const ROLE_GRADIENTS: Record<AgentRole, string> = {
@@ -13,7 +14,7 @@ const ROLE_GRADIENTS: Record<AgentRole, string> = {
 };
 
 export function AgentList() {
-  const { data, error } = useAsync(() => api.agents());
+  const { data, error } = useAsync(() => api.agents(), [], { refreshMs: 15_000 });
   const navigate = useNavigate();
 
   return (
@@ -38,7 +39,7 @@ export function AgentList() {
               <th>Turno</th>
               <th>Base</th>
               <th>Recursos</th>
-              <th>Status</th>
+              <th>Situação em campo</th>
             </tr>
           </thead>
           <tbody>
@@ -66,13 +67,17 @@ export function AgentList() {
                 </td>
                 <td className="mono">{a._count?.responsibleFor ?? 0}</td>
                 <td>
-                  <span className="row">
-                    <span
-                      className="pulse-dot"
-                      style={{ "--dot-color": a.active ? "var(--state-green)" : "var(--state-gray)" } as CSSProperties}
-                    />
-                    {a.active ? "Em serviço" : "Inativo"}
-                  </span>
+                  {a.active ? (
+                    <div className="cell-badges">
+                      <FieldStatusBadge status={a.fieldStatus} />
+                      <span className="muted">posição {timeAgo(a.lastPositionAt)}</span>
+                    </div>
+                  ) : (
+                    <span className="row">
+                      <span className="pulse-dot" style={{ "--dot-color": "var(--state-gray)" } as CSSProperties} />
+                      Inativo
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
