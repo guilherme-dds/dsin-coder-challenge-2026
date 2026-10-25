@@ -24,26 +24,30 @@ function count(samples: Map<string, number>, labels: Record<string, string>) {
  * PROMETHEUS possa coletar o estado do parque junto com a telemetria dos equipamentos.
  */
 metricsRouter.get("/", async (_req, res) => {
-  const [equipments, agents] = await Promise.all([
+  const [equipments, agents, alerts] = await Promise.all([
     prisma.equipment.findMany({ include: { type: true } }),
     prisma.agent.findMany({ where: { active: true }, select: { role: true } }),
+    prisma.alert.findMany({ where: { status: { not: "RESOLVIDO" } }, select: { kind: true, severity: true } }),
   ]);
 
   const byStatus = new Map<string, number>();
   const byUrgency = new Map<string, number>();
   const agentsByRole = new Map<string, number>();
+  const openAlerts = new Map<string, number>();
 
   for (const e of equipments.map(toEquipmentDto)) {
     count(byStatus, { tipo: e.type.code, situacao: e.status, bairro: e.district, cidade: e.city });
     count(byUrgency, { tipo: e.type.code, urgencia: e.urgency });
   }
   for (const a of agents) count(agentsByRole, { funcao: a.role });
+  for (const a of alerts) count(openAlerts, { regra: a.kind, gravidade: a.severity });
 
   res.type("text/plain; version=0.0.4").send(
     [
       gauge("fogo_equipamentos", "Quantidade de equipamentos por tipo, situação e bairro", byStatus),
       gauge("fogo_equipamentos_urgencia", "Quantidade de equipamentos por nível de urgência", byUrgency),
       gauge("fogo_agentes_ativos", "Quantidade de agentes ativos por função", agentsByRole),
+      gauge("fogo_alertas_abertos", "Alertas não resolvidos por regra e gravidade", openAlerts),
     ].join("\n\n") + "\n",
   );
 });

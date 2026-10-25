@@ -81,7 +81,11 @@ web/
   reprogramada automaticamente.
 - **Histórico de eventos**: toda mudança gera um evento imutável, com agente responsável e observação. É ele que
   alimenta a camada de calor de falhas.
-- **Pronto para o PROMETHEUS**: `GET /metrics` expõe o inventário no formato de exposição do Prometheus.
+- **Motor de alertas**: a cada 30 s (e logo após cada mudança feita pelo operador) as regras são reavaliadas sobre o
+  estado da cidade: furto, falha reportada, equipamento sem comunicação, manutenção vencida ou próxima, agente sem
+  sinal e região com disponibilidade abaixo de 80%. O alerta abre sozinho, muda de gravidade se a situação piorar e
+  se resolve sozinho quando a condição deixa de existir; o operador apenas o reconhece.
+- **Pronto para o PROMETHEUS**: `GET /metrics` expõe o inventário e os alertas abertos no formato de exposição do Prometheus.
 - **Cadastro assistido**: CEP preenche o endereço (ViaCEP); coordenadas vêm do clique no mapa ou do GPS do dispositivo.
 
 ## API
@@ -90,6 +94,8 @@ web/
 | ------ | --------------------------------- | ------------------------------------------- |
 | GET    | `/api/map`                        | Equipamentos, agentes e pontos de calor     |
 | GET    | `/api/dashboard`                  | Indicadores por urgência, situação e tipo   |
+| GET    | `/api/alerts`                     | Alertas, mais graves primeiro. Filtros: `status` (padrão `ABERTO,RECONHECIDO`), `severity`, `regionId` |
+| POST   | `/api/alerts/:id/acknowledge`     | Reconhece um alerta aberto (`by` opcional)  |
 | GET    | `/api/equipment-types`            | Tipos e seus atributos                      |
 | POST   | `/api/equipment-types`            | Cria tipo (com `attributesSchema`)          |
 | GET    | `/api/equipments`                 | Filtros: `q`, `typeId`, `status`, `district`, `urgency` |

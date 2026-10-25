@@ -12,6 +12,7 @@ import {
   statusChangeInput,
 } from "./schemas.js";
 import { changeStatus, toEquipmentDto, validateAttributes } from "./service.js";
+import { scheduleAlertEvaluation } from "../alerts/engine.js";
 
 export const equipmentsRouter = Router();
 
@@ -73,6 +74,7 @@ equipmentsRouter.post("/", async (req, res) => {
     },
     include: { type: true },
   });
+  scheduleAlertEvaluation();
   res.status(201).json(toEquipmentDto(equipment));
 });
 
@@ -89,12 +91,15 @@ equipmentsRouter.put("/:id", async (req, res) => {
     },
     include: { type: true },
   });
+  scheduleAlertEvaluation();
   res.json(toEquipmentDto(equipment));
 });
 
 equipmentsRouter.post("/:id/status", async (req, res) => {
   const { status, note, agentId } = statusChangeInput.parse(req.body);
-  res.json(await changeStatus(req.params.id, status, note, agentId));
+  const equipment = await changeStatus(req.params.id, status, note, agentId);
+  scheduleAlertEvaluation();
+  res.json(equipment);
 });
 
 equipmentsRouter.post("/:id/maintenance", async (req, res) => {
@@ -108,5 +113,6 @@ equipmentsRouter.post("/:id/maintenance", async (req, res) => {
     },
     include: { type: true },
   });
+  scheduleAlertEvaluation();
   res.json(toEquipmentDto(equipment));
 });
