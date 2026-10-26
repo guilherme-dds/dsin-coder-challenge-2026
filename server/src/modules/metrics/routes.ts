@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { buildOverview } from "../regions/service.js";
+import { forecastRisk } from "../predictions/risk.js";
+import { predictFailures } from "../predictions/failures.js";
 
 export const metricsRouter = Router();
 
@@ -23,8 +25,21 @@ function count(samples: Map<string, number>, labels: Record<string, string>) {
  * PROMETHEUS possa coletar o estado do parque junto com a telemetria dos equipamentos.
  */
 metricsRouter.get("/", async (_req, res) => {
-  const { equipments, agents, alerts, regions } = await buildOverview();
-  const availability = new Map(regions.map((r) => [`regiao="${escapeLabel(r.name)}"`, r.availability]));
+  const [{ equipments, agents, alerts, regions }, forecast, failures] = await Promise.all([
+    buildOverview(),
+    forecastRisk(24),
+    predictFailures(7),
+  ]);
+  const label = (name: string) => `regiao="${escapeLabel(name)}"`;
+  const riskNow = new Map(forecast.regions.map((r) => [label(r.region.name), r.now.riskIndex]));
+  const riskPeak = new Map(forecast.regions.map((r) => [label(r.region.name), r.peak.riskIndex]));
+  const failureProbability = new Map(
+    failures.predictions.map((p) => [
+      `equipamento="${escapeLabel(p.equipment.serialNumber)}",tipo="${p.equipment.type.code}"`,
+      p.probability,
+    ]),
+  );
+  const availability = new Map(regions.map((r) => [label(r.name), r.availability]));
 
   const byStatus = new Map<string, number>();
   const byUrgency = new Map<string, number>();
@@ -45,6 +60,10 @@ metricsRouter.get("/", async (_req, res) => {
       gauge("fogo_agentes_ativos", "Quantidade de agentes ativos por função", agentsByRole),
       gauge("fogo_alertas_abertos", "Alertas não resolvidos por regra e gravidade", openAlerts),
       gauge("fogo_disponibilidade_percentual", "Percentual de equipamentos instalados operando, por região", availability),
+      gauge("fogo_risco_previsto", "Índice de risco previsto (0-100) para a hora atual, por região", riskNow),
+      gauge("fogo_risco_pico_24h", "Maior índice de risco previsto nas próximas 24 h, por região", riskPeak),
+      gauge("fogo_falha_probabilidade_7d", "Probabilidade de falha nos próximos 7 dias, por equipamento", failureProbability),
+      gauge("fogo_falhas_esperadas_7d", "Falhas esperadas na rede nos próximos 7 dias", new Map([["", failures.expectedFailures]])),
     ].join("\n\n") + "\n",
   );
 });

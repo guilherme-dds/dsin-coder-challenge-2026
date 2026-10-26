@@ -142,9 +142,11 @@ cálculo é feito e como usar o resultado.
 
 - **O que detecta**: equipamentos cujas medições fugiram do padrão do próprio equipamento, mesmo sem ter falhado
   (ex.: radar contando 68% menos veículos: sensor com defeito ou tráfego desviado).
-- **Como calcula**: cada um dos últimos 3 dias completos é comparado com a mediana de 7 a 35 dias atrás, **do mesmo
-  tipo de dia** (útil ou fim de semana, para o domingo não parecer queda), em desvios robustos (MAD). 3 ou mais desvios
-  em pelo menos 2 dias caracterizam a anomalia, que vem com uma interpretação do que ela costuma significar.
+- **Como calcula**: cada um dos últimos 3 dias completos é comparado com a mediana de 7 a 35 dias atrás, depois de
+  **descontar o peso do dia da semana** aprendido no próprio equipamento (ajuste sazonal: o domingo de um radar vale
+  ~0,45 de um dia útil, então um domingo tranquilo não parece queda). A distância é medida em desvios robustos (MAD).
+  3 ou mais desvios **e** variação de 30% ou mais, em pelo menos 2 dias, caracterizam a anomalia: estatisticamente
+  improvável e grande o bastante para importar. Cada anomalia vem com uma interpretação do que costuma significar.
 
 ### Tendências
 
@@ -154,6 +156,23 @@ cálculo é feito e como usar o resultado.
 - **Uso dos equipamentos**: regressão das médias semanais de uso (radar, cancela, totem, balança) das últimas 8
   semanas. Médias semanais evitam que o fim de semana pareça queda.
 - Só é apontada como tendência a inclinação que dificilmente é acaso (estatística t ≥ 2) e de tamanho relevante.
+
+### Alertas preventivos e recomendações
+
+As previsões entram no mesmo motor de alertas da operação, marcadas como **preventivas** (nunca críticas, porque o
+problema ainda não aconteceu). Abrem sozinhas, mudam de gravidade e se resolvem quando a previsão deixa de apontar
+o problema. São recalculadas a cada 5 min.
+
+| Alerta | Quando abre | Ação recomendada |
+| ------ | ----------- | ---------------- |
+| Risco previsto | Região com índice ≥ 90 nas próximas 3 h **e** efetivo insuficiente (ou momento acima do normal) | Remanejar ou escalar agentes para o pico (sugestão da recomendação de reforço) |
+| Falha provável | Equipamento com ≥ 25% de chance de falhar em 7 dias, ou com desgaste cruzando o limite | A ação do fator principal: antecipar a manutenção, vistoria do sensor… |
+| Comportamento anômalo | Medição fora do padrão do equipamento (quando não já explicada por uma falha provável) | A interpretação da anomalia |
+| Tendência de queda | Região com disponibilidade caindo e abaixo de 80% (ou cruzando 80% em até 7 dias) | Priorizar os reparos da região |
+| Ocorrências em alta | Região com ocorrências subindo 5% ou mais por semana | Revisar escala e rondas |
+
+**Todo alerta**, preventivo ou não, passou a trazer uma **ação recomendada** (ex.: furto → "acionar a Guarda Municipal,
+registrar o boletim e avaliar a reposição").
 
 ## Estrutura
 
@@ -199,8 +218,9 @@ web/
 - **Visão por região**: os bairros são agrupados em regiões, e cada região recebe um nível de saúde: _crítico_ (alerta
   crítico aberto ou disponibilidade abaixo de 60%), _atenção_ (alerta de gravidade alta ou disponibilidade abaixo de
   80%) ou _normal_. A disponibilidade da cidade e de cada região é registrada a cada 15 min para o gráfico histórico.
-- **Pronto para o PROMETHEUS**: `GET /metrics` expõe o inventário, os alertas abertos e a disponibilidade por região
-  no formato de exposição do Prometheus.
+- **Pronto para o PROMETHEUS**: `GET /metrics` expõe o inventário, os alertas abertos, a disponibilidade por região
+  e as previsões (risco atual e de pico por região, probabilidade de falha por equipamento e falhas esperadas na
+  semana) no formato de exposição do Prometheus.
 - **Cadastro assistido**: CEP preenche o endereço (ViaCEP); coordenadas vêm do clique no mapa ou do GPS do dispositivo.
 
 ## API
@@ -211,7 +231,7 @@ web/
 | GET    | `/api/dashboard`                  | Disponibilidade, agentes em atividade, alertas, conectividade e composição da rede |
 | GET    | `/api/regions`                    | Visão consolidada por região, das que exigem atenção para as normais |
 | GET    | `/api/regions/history`            | Histórico de disponibilidade (`regionId` opcional; sem ele, a cidade) por `hours` (padrão 24) |
-| GET    | `/api/alerts`                     | Alertas, mais graves primeiro. Filtros: `status` (padrão `ABERTO,RECONHECIDO`), `severity`, `regionId` |
+| GET    | `/api/alerts`                     | Alertas, mais graves primeiro, com a ação recomendada. Filtros: `status` (padrão `ABERTO,RECONHECIDO`), `severity`, `regionId`, `preventive` |
 | POST   | `/api/alerts/:id/acknowledge`     | Reconhece um alerta aberto (`by` opcional)  |
 | GET    | `/api/equipment-types`            | Tipos e seus atributos                      |
 | POST   | `/api/equipment-types`            | Cria tipo (com `attributesSchema`)          |

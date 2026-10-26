@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, X } from "lucide-react";
-import { ALERT_KIND_LABELS, SEVERITY, timeAgo } from "../labels";
+import { ALERT_KIND_LABELS, PREVENTIVE_KINDS, SEVERITY, timeAgo } from "../labels";
 import { useNow } from "../hooks";
 import { Shape } from "./Badges";
 import type { Alert, AlertSeverity } from "../types";
@@ -59,9 +59,14 @@ export function AlertsPanel({ alerts, onSelect, onAcknowledge, onClose }: Props)
       className={`alert-item ${fresh.has(alert.id) ? "fresh" : ""} ${alert.status !== "ABERTO" ? "acknowledged" : ""}`}
     >
       <Shape color={SEVERITY[alert.severity].color} shape={SEVERITY[alert.severity].shape} />
-      <button className="alert-body" onClick={() => onSelect(alert)} title={alert.message ?? "Ver no mapa"}>
+      <button
+        className="alert-body"
+        onClick={() => onSelect(alert)}
+        title={[alert.message, alert.recommendation && `Ação: ${alert.recommendation}`].filter(Boolean).join("\n") || "Ver no mapa"}
+      >
         <strong>{alert.title}</strong>
         <span className="alert-kind">
+          {PREVENTIVE_KINDS.includes(alert.kind) && <span className="tag">Preventivo</span>}
           {ALERT_KIND_LABELS[alert.kind]}
           {alert.region && ` · ${alert.region.name}`} · {timeAgo(alert.openedAt, now)}
         </span>

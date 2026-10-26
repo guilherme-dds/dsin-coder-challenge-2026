@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
 import { inStartupGrace } from "../../lib/uptime.js";
-import type { AlertKind, AlertSeverity } from "../../domain/alerts.js";
+import { DEFAULT_RECOMMENDATIONS, type AlertKind, type AlertSeverity } from "../../domain/alerts.js";
 import {
   REGION_CRITICAL_PCT,
   REGION_DEGRADED_PCT,
@@ -12,6 +12,7 @@ import { UNSTABLE_WINDOW_MS } from "../../domain/connectivity.js";
 import { findViolations, type TelemetryMetrics } from "../../domain/telemetry.js";
 import { toEquipmentDto } from "../equipments/service.js";
 import { loadRegionIndex } from "../regions/service.js";
+import { preventiveCandidates } from "../predictions/preventive.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const UPCOMING_WINDOW_DAYS = 7;
@@ -25,6 +26,8 @@ interface AlertCandidate {
   severity: AlertSeverity;
   title: string;
   message: string;
+  /** Ação específica; sem ela, vale a recomendação padrão da regra. */
+  recommendation?: string;
   equipmentId?: string;
   agentId?: string;
   regionId?: string;
@@ -157,7 +160,8 @@ export async function evaluateAlerts(now = new Date()) {
   // Na carência de partida, regras que dependem do silêncio dos dispositivos ficam congeladas:
   // não abrem alertas novos nem resolvem os que já estavam abertos.
   const grace = inStartupGrace();
-  const candidates = (await collectCandidates(now)).filter((c) => !grace || !SILENCE_KINDS.includes(c.kind));
+  const [current, preventive] = await Promise.all([collectCandidates(now), preventiveCandidates(now)]);
+  const candidates = [...current, ...preventive].filter((c) => !grace || !SILENCE_KINDS.includes(c.kind));
   const open = await prisma.alert.findMany({ where: { status: { not: "RESOLVIDO" } } });
   const openByKey = new Map(open.map((a) => [a.dedupKey, a]));
   const wanted = new Set<string>();
@@ -167,17 +171,19 @@ export async function evaluateAlerts(now = new Date()) {
     const key = dedupKey(candidate);
     wanted.add(key);
     const existing = openByKey.get(key);
+    const recommendation = candidate.recommendation ?? DEFAULT_RECOMMENDATIONS[candidate.kind] ?? null;
     if (!existing) {
-      operations.push(prisma.alert.create({ data: { ...candidate, dedupKey: key, openedAt: now } }));
+      operations.push(prisma.alert.create({ data: { ...candidate, recommendation, dedupKey: key, openedAt: now } }));
     } else if (
       existing.severity !== candidate.severity ||
       existing.title !== candidate.title ||
-      existing.message !== candidate.message
+      existing.message !== candidate.message ||
+      existing.recommendation !== recommendation
     ) {
       operations.push(
         prisma.alert.update({
           where: { id: existing.id },
-          data: { severity: candidate.severity, title: candidate.title, message: candidate.message },
+          data: { severity: candidate.severity, title: candidate.title, message: candidate.message, recommendation },
         }),
       );
     }

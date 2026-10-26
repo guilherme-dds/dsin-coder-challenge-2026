@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { HttpError, notFound } from "../../lib/http-error.js";
-import { ALERT_SEVERITIES, ALERT_STATUSES, type AlertSeverity } from "../../domain/alerts.js";
+import { ALERT_SEVERITIES, ALERT_STATUSES, PREVENTIVE_KINDS, type AlertSeverity } from "../../domain/alerts.js";
 
 const alertFilters = z.object({
   /** Lista separada por vírgula; por padrão, só os alertas não resolvidos. */
@@ -12,6 +12,8 @@ const alertFilters = z.object({
     .transform((s) => s.split(","))
     .pipe(z.array(z.enum(ALERT_STATUSES))),
   severity: z.enum(ALERT_SEVERITIES).optional(),
+  /** true: só os preventivos (previsões); false: só os do que já está acontecendo. */
+  preventive: z.enum(["true", "false"]).optional(),
   regionId: z.string().optional(),
   limit: z.coerce.number().int().positive().max(500).default(200),
 });
@@ -25,7 +27,17 @@ export const alertsRouter = Router();
 alertsRouter.get("/", async (req, res) => {
   const filters = alertFilters.parse(req.query);
   const alerts = await prisma.alert.findMany({
-    where: { status: { in: filters.status }, severity: filters.severity, regionId: filters.regionId },
+    where: {
+      status: { in: filters.status },
+      severity: filters.severity,
+      regionId: filters.regionId,
+      kind:
+        filters.preventive === undefined
+          ? undefined
+          : filters.preventive === "true"
+            ? { in: PREVENTIVE_KINDS }
+            : { notIn: PREVENTIVE_KINDS },
+    },
     include: {
       equipment: {
         select: {

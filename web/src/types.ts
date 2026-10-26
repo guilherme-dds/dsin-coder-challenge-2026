@@ -31,7 +31,12 @@ export type AlertKind =
   | "MANUTENCAO_PROXIMA"
   | "LEITURA_ANOMALA"
   | "REGIAO_DEGRADADA"
-  | "AGENTE_SEM_SINAL";
+  | "AGENTE_SEM_SINAL"
+  | "RISCO_PREVISTO"
+  | "FALHA_PROVAVEL"
+  | "COMPORTAMENTO_ANOMALO"
+  | "TENDENCIA_DISPONIBILIDADE"
+  | "TENDENCIA_OCORRENCIAS";
 
 export type HealthLevel = "CRITICO" | "ATENCAO" | "NORMAL";
 
@@ -191,6 +196,8 @@ export interface Alert {
   status: AlertStatus;
   title: string;
   message: string | null;
+  /** Ação recomendada ao operador. */
+  recommendation: string | null;
   openedAt: string;
   acknowledgedAt: string | null;
   acknowledgedBy: string | null;

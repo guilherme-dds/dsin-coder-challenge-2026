@@ -1,6 +1,5 @@
 import type { AlertSeverity } from "./alerts.js";
 
-/** Ocorrências operacionais atendidas pelas equipes em campo. */
 export const OCCURRENCE_KINDS = [
   "ACIDENTE",
   "CONGESTIONAMENTO",
@@ -21,7 +20,6 @@ export const OCCURRENCE_LABELS: Record<OccurrenceKind, string> = {
   SEMAFORO_INOPERANTE: "Semáforo inoperante",
 };
 
-/** Tempo típico de atendimento, em minutos: quanto tempo a ocorrência ocupa a equipe. */
 export const HANDLING_MINUTES: Record<OccurrenceKind, number> = {
   ACIDENTE: 70,
   CONGESTIONAMENTO: 45,
@@ -31,7 +29,6 @@ export const HANDLING_MINUTES: Record<OccurrenceKind, number> = {
   SEMAFORO_INOPERANTE: 90,
 };
 
-/** Agentes normalmente empenhados conforme a gravidade. */
 export const AGENTS_BY_SEVERITY: Record<AlertSeverity, number> = {
   CRITICA: 3,
   ALTA: 2,

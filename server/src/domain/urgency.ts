@@ -1,11 +1,14 @@
 import type { Connectivity } from "./connectivity.js";
 import type { EquipmentStatus, MaintenanceType } from "./status.js";
 
-/**
- * Nível de urgência operacional de um equipamento, usado para colorir o mapa
- * e priorizar o atendimento das equipes de campo.
- */
-export const URGENCY_LEVELS = ["CRITICO", "ALERTA", "ATENCAO", "NORMAL", "PENDENTE", "INATIVO"] as const;
+export const URGENCY_LEVELS = [
+  "CRITICO",
+  "ALERTA",
+  "ATENCAO",
+  "NORMAL",
+  "PENDENTE",
+  "INATIVO",
+] as const;
 
 export type UrgencyLevel = (typeof URGENCY_LEVELS)[number];
 
@@ -22,15 +25,19 @@ interface UrgencyInput {
 export function urgency(input: UrgencyInput, now = new Date()): UrgencyLevel {
   const { status, maintenanceType, nextMaintenanceAt, connectivity } = input;
 
-  if (status === "FURTADO" || status === "DESATIVADO" || status === "BAIXADO") return "INATIVO";
+  if (status === "FURTADO" || status === "DESATIVADO" || status === "BAIXADO")
+    return "INATIVO";
   if (status === "NAO_INSTALADO") return "PENDENTE";
-  if (status === "MAU_FUNCIONAMENTO" || maintenanceType === "IMEDIATA") return "CRITICO";
-  // A falha silenciosa: ninguém registrou problema, mas o dispositivo parou de responder.
-  // Em manutenção é normal ficar desligado, então não conta.
+  if (status === "MAU_FUNCIONAMENTO" || maintenanceType === "IMEDIATA")
+    return "CRITICO";
   if (connectivity === "OFFLINE" && status !== "EM_MANUTENCAO") return "ALERTA";
-  if (nextMaintenanceAt && nextMaintenanceAt.getTime() < now.getTime()) return "ALERTA";
+  if (nextMaintenanceAt && nextMaintenanceAt.getTime() < now.getTime())
+    return "ALERTA";
   if (status === "EM_MANUTENCAO") return "ATENCAO";
-  if (nextMaintenanceAt && nextMaintenanceAt.getTime() - now.getTime() <= UPCOMING_WINDOW_DAYS * DAY_MS) {
+  if (
+    nextMaintenanceAt &&
+    nextMaintenanceAt.getTime() - now.getTime() <= UPCOMING_WINDOW_DAYS * DAY_MS
+  ) {
     return "ATENCAO";
   }
   return "NORMAL";
@@ -40,5 +47,7 @@ export function urgencyPriority(level: UrgencyLevel): number {
   return URGENCY_LEVELS.indexOf(level);
 }
 
-/** Situações que contam como falha para a camada de calor do mapa. */
-export const FAILURE_STATUSES: EquipmentStatus[] = ["MAU_FUNCIONAMENTO", "FURTADO"];
+export const FAILURE_STATUSES: EquipmentStatus[] = [
+  "MAU_FUNCIONAMENTO",
+  "FURTADO",
+];

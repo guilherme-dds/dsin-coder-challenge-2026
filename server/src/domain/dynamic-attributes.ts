@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-/** Definição de um campo específico de um tipo de equipamento. */
 export const attributeFieldSchema = z.object({
   key: z.string().regex(/^[a-zA-Z][a-zA-Z0-9]*$/, "use camelCase sem espaços"),
   label: z.string().min(1),
@@ -12,20 +11,29 @@ export const attributeFieldSchema = z.object({
 
 export type AttributeField = z.infer<typeof attributeFieldSchema>;
 
-export const attributesSchemaSchema = z.array(attributeFieldSchema).superRefine((fields, ctx) => {
-  const seen = new Set<string>();
-  fields.forEach((field, index) => {
-    if (seen.has(field.key)) {
-      ctx.addIssue({ code: "custom", path: [index, "key"], message: `chave duplicada: ${field.key}` });
-    }
-    seen.add(field.key);
-    if (field.type === "select" && !field.options?.length) {
-      ctx.addIssue({ code: "custom", path: [index, "options"], message: "campos select precisam de opções" });
-    }
+export const attributesSchemaSchema = z
+  .array(attributeFieldSchema)
+  .superRefine((fields, ctx) => {
+    const seen = new Set<string>();
+    fields.forEach((field, index) => {
+      if (seen.has(field.key)) {
+        ctx.addIssue({
+          code: "custom",
+          path: [index, "key"],
+          message: `chave duplicada: ${field.key}`,
+        });
+      }
+      seen.add(field.key);
+      if (field.type === "select" && !field.options?.length) {
+        ctx.addIssue({
+          code: "custom",
+          path: [index, "options"],
+          message: "campos select precisam de opções",
+        });
+      }
+    });
   });
-});
 
-/** Gera, em tempo de execução, o validador dos atributos a partir da definição do tipo. */
 export function buildAttributesValidator(fields: AttributeField[]) {
   const shape: Record<string, z.ZodTypeAny> = {};
 
@@ -44,7 +52,9 @@ export function buildAttributesValidator(fields: AttributeField[]) {
       default:
         validator = z.string().min(1);
     }
-    shape[field.key] = field.required ? validator : validator.optional().nullable();
+    shape[field.key] = field.required
+      ? validator
+      : validator.optional().nullable();
   }
 
   return z.object(shape).strict();

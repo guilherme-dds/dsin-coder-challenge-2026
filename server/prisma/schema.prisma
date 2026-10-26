@@ -170,17 +170,19 @@ model District {
 
 /// Alerta operacional gerado pelo motor de regras (ou por um operador).
 model Alert {
-  id       String  @id @default(cuid())
+  id             String  @id @default(cuid())
   /// Regra que gerou o alerta (ver src/domain/alerts.ts)
-  kind     String
+  kind           String
   /// CRITICA | ALTA | MEDIA | BAIXA
-  severity String
+  severity       String
   /// ABERTO | RECONHECIDO | RESOLVIDO
-  status   String  @default("ABERTO")
-  title    String
-  message  String?
+  status         String  @default("ABERTO")
+  title          String
+  message        String?
+  /// Ação recomendada ao operador
+  recommendation String?
   /// Evita alertas repetidos: no máximo um alerta não resolvido por regra + origem
-  dedupKey String
+  dedupKey       String
 
   equipmentId String?
   equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)

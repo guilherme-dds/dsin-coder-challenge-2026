@@ -2402,6 +2402,18 @@ tr.clickable:hover td {
   color: var(--muted);
 }
 
+/* Etiqueta de texto (ex.: "Preventivo" nos alertas que antecipam um problema) */
+.tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  font-size: 0.68rem;
+  color: var(--text-2);
+  vertical-align: 1px;
+}
+
 /* ==========================================================================
    Animações: só as que carregam informação
    ========================================================================== */

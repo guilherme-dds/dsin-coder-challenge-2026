@@ -4,7 +4,7 @@ import { HISTORY_WEEKS } from "./risk-model.js";
 import { forecastRisk, riskHeatmap } from "./risk.js";
 import { recommendStaffing } from "./staffing.js";
 import { DEGRADATION_WINDOW_DAYS, FAILURE_HISTORY_DAYS, predictFailures } from "./failures.js";
-import { BASELINE_FROM_DAYS, BASELINE_TO_DAYS, RECENT_DAYS, Z_THRESHOLD, detectAnomalies } from "./anomalies.js";
+import { BASELINE_FROM_DAYS, BASELINE_TO_DAYS, MIN_CHANGE, RECENT_DAYS, Z_THRESHOLD, detectAnomalies } from "./anomalies.js";
 import { AVAILABILITY_WINDOW_DAYS, OCCURRENCE_WINDOW_WEEKS, UTILIZATION_WINDOW_WEEKS, analyzeTrends } from "./trends.js";
 
 const horizon = z.object({ hours: z.coerce.number().int().min(1).max(72).default(24) });
@@ -69,8 +69,9 @@ const ABOUT = {
     inputs: [`Telemetria diária dos últimos ${BASELINE_TO_DAYS} dias de cada equipamento`],
     method:
       `Cada um dos últimos ${RECENT_DAYS} dias completos é comparado com a mediana de ${BASELINE_FROM_DAYS} a ${BASELINE_TO_DAYS} ` +
-      `dias atrás, do mesmo tipo de dia (útil ou fim de semana), em desvios robustos. ${Z_THRESHOLD} ou mais desvios ` +
-      "em pelo menos 2 dias caracterizam a anomalia.",
+      "dias atrás, depois de descontar o peso do dia da semana aprendido no próprio equipamento (ajuste sazonal: " +
+      `domingo não parece queda), em desvios robustos. ${Z_THRESHOLD} ou mais desvios e variação de ${MIN_CHANGE * 100}% ou mais, ` +
+      "em pelo menos 2 dias, caracterizam a anomalia.",
     use: "Encontrar sensores com defeito, desvios de tráfego e equipamentos se deteriorando antes de virarem falha.",
   },
   trends: {

@@ -13,6 +13,8 @@ export const BASELINE_FROM_DAYS = 7;
 export const BASELINE_TO_DAYS = 35;
 /** A partir de quantos desvios robustos um dia é considerado fora do padrão. */
 export const Z_THRESHOLD = 3;
+/** Além de improvável, o desvio precisa ser grande o bastante para importar na operação. */
+export const MIN_CHANGE = 0.3;
 
 /** O que costuma significar um desvio em cada medição. */
 const INTERPRETATIONS: Record<string, { down?: string; up?: string }> = {
@@ -31,8 +33,19 @@ const INTERPRETATIONS: Record<string, { down?: string; up?: string }> = {
   bateriaPct: { down: "Bateria descarregando mais que o normal." },
 };
 
-/** Fim de semana e dia útil têm padrões diferentes: cada dia é comparado com dias do mesmo tipo. */
-const dayType = (date: Date) => (cityWeekday(date) === 0 || cityWeekday(date) === 6 ? "fim de semana" : "dia útil");
+/**
+ * Peso de cada dia da semana no próprio equipamento (ex.: domingo = 0,45 do normal num radar),
+ * aprendido na linha de base. Dividir pelo peso "tira o dia da semana" do valor (ajuste sazonal),
+ * para que um domingo tranquilo não pareça queda e uma sexta movimentada não pareça pico.
+ */
+function weekdayIndex(points: { date: Date; avg: number }[]) {
+  const overall = median(points.map((p) => p.avg));
+  return Array.from({ length: 7 }, (_, weekday) => {
+    const values = points.filter((p) => cityWeekday(p.date) === weekday).map((p) => p.avg);
+    const index = values.length >= 2 && overall > 0 ? median(values) / overall : 1;
+    return index > 0 ? index : 1;
+  });
+}
 
 export interface Anomaly {
   equipment: { id: string; serialNumber: string; type: { code: string; name: string }; district: string };
@@ -41,7 +54,7 @@ export interface Anomaly {
   direction: "ALTA" | "QUEDA";
   /** Média dos dias fora do padrão. */
   recent: number;
-  /** Mediana da linha de base para o mesmo tipo de dia. */
+  /** Valor normal esperado para aqueles dias da semana. */
   baseline: number;
   changePct: number;
   /** Desvio do dia mais atípico, em desvios robustos. */
@@ -53,7 +66,7 @@ export interface Anomaly {
 
 /**
  * Detecta medições que fugiram do padrão do próprio equipamento nos últimos dias completos,
- * comparando cada dia com a mediana e o desvio robusto de dias do mesmo tipo (útil ou fim de semana).
+ * comparando cada dia (ajustado pelo dia da semana) com a mediana e o desvio robusto da linha de base.
  */
 export async function detectAnomalies(now = new Date()) {
   const today = cityDayStart(now);
@@ -76,16 +89,20 @@ export async function detectAnomalies(now = new Date()) {
     const base = points.filter((p) => age(p.date) >= BASELINE_FROM_DAYS && age(p.date) <= BASELINE_TO_DAYS);
     if (recent.length < MIN_ANOMALOUS_DAYS || base.length < 8) continue;
 
+    const index = weekdayIndex(base);
+    const adjusted = (p: { date: Date; avg: number }) => p.avg / index[cityWeekday(p.date)];
+    const reference = base.map(adjusted);
+    const m = median(reference);
+    // Piso no desvio: medições muito estáveis não disparam alarme por variações minúsculas
+    const spread = Math.max(robustSpread(reference), Math.abs(m) * 0.05, 0.5);
     const flagged = recent
-      .map((p) => {
-        const sameType = base.filter((b) => dayType(b.date) === dayType(p.date)).map((b) => b.avg);
-        const reference = sameType.length >= 4 ? sameType : base.map((b) => b.avg);
-        const m = median(reference);
-        // Piso no desvio: medições muito estáveis não disparam alarme por variações minúsculas
-        const spread = Math.max(robustSpread(reference), Math.abs(m) * 0.05, 0.5);
-        return { point: p, baseline: m, z: (p.avg - m) / spread };
-      })
-      .filter((d) => Math.abs(d.z) >= Z_THRESHOLD);
+      .map((p) => ({
+        point: p,
+        // Linha de base expressa no dia da semana do ponto, para a comparação fazer sentido ao gestor
+        baseline: m * index[cityWeekday(p.date)],
+        z: (adjusted(p) - m) / spread,
+      }))
+      .filter((d) => Math.abs(d.z) >= Z_THRESHOLD && Math.abs(d.point.avg - d.baseline) >= MIN_CHANGE * Math.abs(d.baseline));
 
     const down = flagged.filter((d) => d.z < 0);
     const up = flagged.filter((d) => d.z > 0);

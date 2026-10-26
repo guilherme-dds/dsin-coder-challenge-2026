@@ -92,7 +92,21 @@ export const ALERT_KIND_LABELS: Record<AlertKind, string> = {
   LEITURA_ANOMALA: "Leitura anômala",
   REGIAO_DEGRADADA: "Região degradada",
   AGENTE_SEM_SINAL: "Agente sem sinal",
+  RISCO_PREVISTO: "Risco previsto",
+  FALHA_PROVAVEL: "Falha provável",
+  COMPORTAMENTO_ANOMALO: "Comportamento anômalo",
+  TENDENCIA_DISPONIBILIDADE: "Tendência de queda",
+  TENDENCIA_OCORRENCIAS: "Ocorrências em alta",
 };
+
+/** Alertas que antecipam um problema que ainda não aconteceu. */
+export const PREVENTIVE_KINDS: AlertKind[] = [
+  "RISCO_PREVISTO",
+  "FALHA_PROVAVEL",
+  "COMPORTAMENTO_ANOMALO",
+  "TENDENCIA_DISPONIBILIDADE",
+  "TENDENCIA_OCORRENCIAS",
+];
 
 export const HEALTH: Record<HealthLevel, { label: string; description: string; color: string; shape: IndicatorShape }> = {
   CRITICO: { label: "Crítica", description: "Alerta crítico ou disponibilidade abaixo de 60%", color: "var(--critical)", shape: "diamond" },
