@@ -12,6 +12,7 @@ import { alertsRouter } from "./modules/alerts/routes.js";
 import { telemetryRouter } from "./modules/telemetry/routes.js";
 import { regionsRouter } from "./modules/regions/routes.js";
 import { occurrencesRouter } from "./modules/occurrences/routes.js";
+import { predictionsRouter } from "./modules/predictions/routes.js";
 
 export function createApp() {
   const app = express();
@@ -31,6 +32,7 @@ export function createApp() {
   app.use("/api/telemetry", telemetryRouter);
   app.use("/api/regions", regionsRouter);
   app.use("/api/occurrences", occurrencesRouter);
+  app.use("/api/predictions", predictionsRouter);
   app.use("/api/cep", cepRouter);
   app.use("/metrics", metricsRouter);
 

@@ -141,6 +141,17 @@ const agents = [
   { name: "Juliana Martins", registration: "GM-2210", role: "GUARDA_MUNICIPAL", rank: "Inspetora", shift: "NOITE", baseName: "Sede da Guarda Municipal", district: "Palmital", latitude: -22.2031, longitude: -49.9402 },
   { name: "Rafael Oliveira", registration: "GM-2234", role: "GUARDA_MUNICIPAL", rank: "Guarda 2ª classe", shift: "MADRUGADA", baseName: "Sede da Guarda Municipal", district: "Palmital", latitude: -22.2078, longitude: -49.9348 },
   { name: "Sgt. Marcos Lima", registration: "PM-90871", role: "POLICIAL_MILITAR", rank: "Sargento", shift: "MANHA", baseName: "9º BPM/I", district: "Fragata", latitude: -22.2248, longitude: -49.9590 },
+  // Efetivo distribuído pelas regiões e turnos, para a recomendação de reforço ter onde remanejar
+  { name: "Patrícia Gomes", registration: "AT-1062", role: "AGENTE_TRANSITO", shift: "NOITE", baseName: "Base Central de Trânsito", district: "Centro", latitude: -22.2141, longitude: -49.9481 },
+  { name: "Diego Ferreira", registration: "AT-1078", role: "AGENTE_TRANSITO", shift: "TARDE", baseName: "Base Central de Trânsito", district: "Centro", latitude: -22.2155, longitude: -49.9466 },
+  { name: "Renata Alves", registration: "GM-2251", role: "GUARDA_MUNICIPAL", shift: "TARDE", baseName: "Posto Cascata", district: "Cascata", latitude: -22.2318, longitude: -49.9325 },
+  { name: "Cb. André Rocha", registration: "PM-90912", role: "POLICIAL_MILITAR", rank: "Cabo", shift: "NOITE", baseName: "Posto Nova Marília", district: "Nova Marília", latitude: -22.2411, longitude: -49.9306 },
+  { name: "Thiago Mendes", registration: "GM-2263", role: "GUARDA_MUNICIPAL", shift: "NOITE", baseName: "Posto Fragata", district: "Fragata", latitude: -22.2269, longitude: -49.9568 },
+  { name: "Sd. Larissa Costa", registration: "PM-90934", role: "POLICIAL_MILITAR", rank: "Soldado", shift: "MADRUGADA", baseName: "9º BPM/I", district: "Somenzari", latitude: -22.2231, longitude: -49.9695 },
+  { name: "Bruno Carvalho", registration: "AT-1091", role: "AGENTE_TRANSITO", shift: "MANHA", baseName: "Posto Palmital", district: "Palmital", latitude: -22.2024, longitude: -49.9391 },
+  { name: "Fernanda Lopes", registration: "AT-1103", role: "AGENTE_TRANSITO", shift: "MANHA", baseName: "Posto Zona Norte", district: "Jardim Cavallari", latitude: -22.1962, longitude: -49.9515 },
+  { name: "Gustavo Pereira", registration: "GM-2277", role: "GUARDA_MUNICIPAL", shift: "TARDE", baseName: "Posto Zona Norte", district: "Alto Cafezal", latitude: -22.2063, longitude: -49.9605 },
+  { name: "Sgt. Eduardo Nunes", registration: "PM-90956", role: "POLICIAL_MILITAR", rank: "Sargento", shift: "NOITE", baseName: "Base Rodoviária", district: "Zona Rural", latitude: -22.2396, longitude: -49.9866 },
 ];
 
 interface SeedEquipment {

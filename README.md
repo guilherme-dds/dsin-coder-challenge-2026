@@ -95,6 +95,36 @@ docker compose up -d --build   # web em http://localhost:8080 e API em http://lo
 - **Fila de atendimento** com o motivo de cada equipamento estar nela (manutenção imediata, sem comunicação há X,
   manutenção vencida), **equipes em campo** por situação e a composição da rede por situação, comunicação e tipo.
 
+## Cidade preditiva
+
+Toda previsão responde com um bloco `about`: o que está sendo previsto, quais dados foram considerados, como o
+cálculo é feito e como usar o resultado.
+
+### Risco por região e horário
+
+- **O que prevê**: o risco de ocorrências em cada região, hora a hora, para as próximas horas (até 72 h), e os dias
+  da semana e horários de maior risco (mapa de calor de uma semana típica).
+- **Dados usados**: ocorrências das últimas 12 semanas (região, dia da semana, hora e gravidade), ocorrências das
+  últimas 3 horas e o estado das câmeras de cada região.
+- **Como calcula**: média de cada região × dia da semana × hora, com mais peso para as semanas recentes (meia-vida de
+  3 semanas, para acompanhar tendências), suavizada pelo padrão geral da região quando o horário tem poucos dados.
+  A previsão é ajustada pelo momento atual (mais ou menos ocorrências que o esperado nas últimas 3 h, com efeito que
+  some em poucas horas) e por câmeras fora de operação (vandalismo e furto tendem a subir). O **índice 0–100** diz em
+  quantos % dos horários da cidade a carga esperada (ponderada pela gravidade) é menor: **85+ é risco alto, 60–84
+  moderado**. Cada região traz os **fatores** que pesaram, em linguagem de operação (padrão histórico, tendência de
+  alta ou de queda, momento acima do normal, câmeras fora do ar).
+- **Como ajuda**: antecipar patrulhas e fiscalização nos horários e regiões de maior risco, antes das ocorrências.
+
+### Reforço de agentes
+
+- **O que prevê**: quantos agentes cada região vai precisar em cada turno das próximas horas.
+- **Como calcula**: agentes ocupados esperados no pico do turno (ocorrências × agentes empenhados × tempo de
+  atendimento). O efetivo necessário é o menor número de agentes com o qual a chance de **todos estarem ocupados
+  quando surge uma nova ocorrência** fica abaixo de 20% (distribuição de Poisson). Comparado com os agentes ativos
+  escalados no turno pela região da base, indica **reforçar**, **adequado** ou **folga**, e sugere remanejar de quem
+  tem folga para quem precisa.
+- **Como ajuda**: convocar ou remanejar equipes antes do pico, em vez de reagir depois.
+
 ## Estrutura
 
 ```
@@ -170,6 +200,9 @@ web/
 | GET    | `/api/occurrences`                | Ocorrências. Filtros: `days` (padrão 7), `regionId`, `kind`, `open`, `limit` |
 | POST   | `/api/occurrences`                | Registra ocorrência: `{ kind, severity?, district, latitude, longitude, occurredAt?, agentsDispatched?, equipmentId?, note? }` |
 | POST   | `/api/occurrences/:id/resolve`    | Encerra a ocorrência                        |
+| GET    | `/api/predictions/risk`           | Risco por região, hora a hora (`hours`, padrão 24, máx. 72), com fatores |
+| GET    | `/api/predictions/risk/heatmap`   | Risco esperado por dia da semana × hora (`regionId` opcional) |
+| GET    | `/api/predictions/staffing`       | Agentes necessários × escalados por região e turno, com sugestões (`hours`) |
 | GET    | `/api/agents/:id/positions`       | Trilha recente (`minutes`, padrão 30)       |
 | GET    | `/api/cep/:cep`                   | Consulta endereço no ViaCEP                 |
 | GET    | `/metrics`                        | Métricas no formato Prometheus              |
