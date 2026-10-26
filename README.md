@@ -125,6 +125,36 @@ cálculo é feito e como usar o resultado.
   tem folga para quem precisa.
 - **Como ajuda**: convocar ou remanejar equipes antes do pico, em vez de reagir depois.
 
+### Falha provável (manutenção preditiva)
+
+- **O que prevê**: a probabilidade de cada equipamento operacional falhar nos próximos dias (padrão: 7).
+- **Dados usados**: falhas dos últimos 180 dias por tipo e por bairro, falhas anteriores do equipamento, manutenção
+  vencida, telemetria diária dos últimos 21 dias, alertas recentes de comunicação e leituras fora do padrão.
+- **Como calcula**: risco base = taxa de falhas do tipo no histórico. Cada fator do equipamento multiplica esse risco:
+  desgaste que já passou do limite (×5) ou que deve cruzá-lo em até 7 dias (×4), leitura fora do padrão (×2), falhas
+  anteriores, manutenção vencida, instabilidade e bairro com mais falhas que a média. Probabilidade =
+  1 − e^(−taxa × dias × fatores). O **desgaste** é a tendência (regressão linear) da medição rumo ao limite de
+  funcionamento: a média de quadros da câmera ou a **carga máxima** da bateria (a capacidade, e não o uso).
+- **Como ajuda**: cada equipamento vem com os fatores que pesaram e a ação mais indicada (antecipar a manutenção,
+  vistoria do sensor, executar a preventiva vencida…), para a equipe de manutenção agir antes da falha.
+
+### Anomalias
+
+- **O que detecta**: equipamentos cujas medições fugiram do padrão do próprio equipamento, mesmo sem ter falhado
+  (ex.: radar contando 68% menos veículos: sensor com defeito ou tráfego desviado).
+- **Como calcula**: cada um dos últimos 3 dias completos é comparado com a mediana de 7 a 35 dias atrás, **do mesmo
+  tipo de dia** (útil ou fim de semana, para o domingo não parecer queda), em desvios robustos (MAD). 3 ou mais desvios
+  em pelo menos 2 dias caracterizam a anomalia, que vem com uma interpretação do que ela costuma significar.
+
+### Tendências
+
+- **Disponibilidade**: regressão da disponibilidade por hora da última semana, da cidade e de cada região, projetada
+  7 dias à frente, com o aviso de quando deve cruzar 80% ou 60%.
+- **Ocorrências**: regressão do volume semanal das últimas 12 semanas por região, com a previsão para a próxima semana.
+- **Uso dos equipamentos**: regressão das médias semanais de uso (radar, cancela, totem, balança) das últimas 8
+  semanas. Médias semanais evitam que o fim de semana pareça queda.
+- Só é apontada como tendência a inclinação que dificilmente é acaso (estatística t ≥ 2) e de tamanho relevante.
+
 ## Estrutura
 
 ```
@@ -203,6 +233,9 @@ web/
 | GET    | `/api/predictions/risk`           | Risco por região, hora a hora (`hours`, padrão 24, máx. 72), com fatores |
 | GET    | `/api/predictions/risk/heatmap`   | Risco esperado por dia da semana × hora (`regionId` opcional) |
 | GET    | `/api/predictions/staffing`       | Agentes necessários × escalados por região e turno, com sugestões (`hours`) |
+| GET    | `/api/predictions/failures`       | Probabilidade de falha por equipamento, com fatores e ação (`days`, padrão 7; `limit`) |
+| GET    | `/api/predictions/anomalies`      | Medições fora do padrão do próprio equipamento nos últimos dias |
+| GET    | `/api/predictions/trends`         | Tendências de disponibilidade, ocorrências e uso dos equipamentos |
 | GET    | `/api/agents/:id/positions`       | Trilha recente (`minutes`, padrão 30)       |
 | GET    | `/api/cep/:cep`                   | Consulta endereço no ViaCEP                 |
 | GET    | `/metrics`                        | Métricas no formato Prometheus              |

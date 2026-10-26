@@ -37,6 +37,37 @@ export const METRIC_LIMITS: Record<string, MetricLimit> = {
   bateriaPct: { label: "Bateria", min: 10 },
 };
 
+/** Nome das medições para as explicações das previsões. */
+export const METRIC_LABELS: Record<string, string> = {
+  veiculosHora: "veículos por hora",
+  velocidadeMedia: "velocidade média",
+  infracoesHora: "infrações por hora",
+  fps: "taxa de quadros",
+  bitrateKbps: "taxa de transmissão",
+  pesagensHora: "pesagens por hora",
+  excessosHora: "excessos de peso por hora",
+  transacoesHora: "transações por hora",
+  papelPct: "papel do comprovante",
+  aberturasHora: "aberturas por hora",
+  bateriaPct: "bateria",
+  velocidade: "velocidade",
+  ignicao: "ignição",
+};
+
+/** Medições de fluxo de uso: sobem e descem com a demanda, não com a saúde do dispositivo. */
+export const FLOW_METRICS = ["veiculosHora", "aberturasHora", "transacoesHora", "pesagensHora"];
+
+/**
+ * Como medir o desgaste de cada medição ao longo dos dias, para a manutenção preditiva.
+ * `stat` diz qual resumo diário acompanhar: a média de quadros da câmera, mas a carga MÁXIMA
+ * que a bateria alcança (a capacidade), já que a média só reflete o quanto ela foi usada.
+ */
+export const DEGRADATION_CHECKS: { metric: string; stat: "avg" | "max"; limit: number; meaning: string }[] = [
+  { metric: "fps", stat: "avg", limit: 10, meaning: "a câmera deixa de gerar imagem útil" },
+  { metric: "bitrateKbps", stat: "avg", limit: 500, meaning: "a transmissão de vídeo se torna inviável" },
+  { metric: "bateriaPct", stat: "max", limit: 70, meaning: "a bateria não segura mais uma jornada de uso" },
+];
+
 export interface MetricViolation {
   metric: string;
   label: string;

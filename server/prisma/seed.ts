@@ -551,7 +551,7 @@ async function main() {
     const lastSeenAt = lastSeenFor(e.status);
     const readings = lastSeenAt
       ? [0, 60, 120].map((offset) => ({
-          metrics: JSON.stringify(sampleMetrics(type, random)),
+          metrics: JSON.stringify(applyDegradation(e.serialNumber, sampleMetrics(type, random), 0)),
           receivedAt: new Date(lastSeenAt.getTime() - offset * 1000),
         }))
       : [];
