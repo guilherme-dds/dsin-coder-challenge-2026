@@ -803,6 +803,186 @@ a {
   font-family: var(--font-mono);
 }
 
+/* Saúde (cidade e regiões): selo com ponto e rótulo, nunca só cor */
+.health-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--health-color) 45%, transparent);
+  background: color-mix(in srgb, var(--health-color) 12%, transparent);
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.health-pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--health-color);
+}
+
+.health-pill b {
+  font-family: var(--font-mono);
+}
+
+.card-title .health-pill {
+  margin-left: 6px;
+}
+
+.vital-of {
+  font-size: 1rem;
+  color: var(--muted);
+}
+
+.compact-select {
+  width: auto;
+  padding: 7px 12px;
+  font-size: 0.84rem;
+}
+
+/* Visão consolidada por região */
+.region-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.region-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--health-color);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s, border-color 0.18s;
+}
+
+.region-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--health-color) 55%, transparent);
+}
+
+.region-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.region-availability {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.region-availability b {
+  font-family: var(--font-mono);
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+.region-card .meter {
+  margin-top: 0;
+}
+
+.region-facts,
+.region-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 0.74rem;
+  color: var(--text-soft);
+}
+
+.region-facts span,
+.alert-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.alert-count i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--alert-color);
+}
+
+/* Gráfico de disponibilidade: linha de 2px, grade recessiva, limites tracejados */
+.chart-frame {
+  position: relative;
+  width: 100%;
+}
+
+.chart-frame svg {
+  display: block;
+}
+
+.chart-grid {
+  stroke: rgba(255, 255, 255, 0.06);
+}
+
+.chart-threshold {
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-dasharray: 4 4;
+}
+
+.chart-axis {
+  fill: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--ember);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-crosshair {
+  stroke: rgba(255, 255, 255, 0.3);
+}
+
+.chart-dot {
+  fill: var(--ember);
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+
+.chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-solid);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  font-size: 0.76rem;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.chart-tooltip.below {
+  transform: translate(-50%, 0);
+}
+
 .section-label {
   font-family: var(--font-mono);
   font-size: 0.68rem;

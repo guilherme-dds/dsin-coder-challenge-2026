@@ -117,7 +117,7 @@ export const MAINTENANCE_LABELS: Record<MaintenanceType, string> = {
 /** `hex` é usado onde variáveis CSS não chegam (ícones e camadas do Leaflet). */
 export const URGENCY: Record<UrgencyLevel, { label: string; description: string; color: string; hex: string }> = {
   CRITICO: { label: "Crítico", description: "Falha ativa ou manutenção imediata", color: "var(--state-red)", hex: "#ff4d5e" },
-  ALERTA: { label: "Alerta", description: "Manutenção vencida", color: "var(--state-orange)", hex: "#ff9f1c" },
+  ALERTA: { label: "Alerta", description: "Sem comunicação ou manutenção vencida", color: "var(--state-orange)", hex: "#ff9f1c" },
   ATENCAO: { label: "Atenção", description: "Em manutenção ou manutenção nos próximos 7 dias", color: "var(--state-yellow)", hex: "#ffd23f" },
   NORMAL: { label: "Normal", description: "Operando normalmente", color: "var(--state-green)", hex: "#2ee59d" },
   PENDENTE: { label: "Pendente", description: "Aguardando instalação", color: "var(--state-blue)", hex: "#4d9fff" },

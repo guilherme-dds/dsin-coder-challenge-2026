@@ -1,6 +1,7 @@
 import type {
   Agent,
   Alert,
+  AvailabilityPoint,
   Dashboard,
   Equipment,
   EquipmentRecord,
@@ -52,6 +53,8 @@ export const api = {
   operationsMap: () => request<OperationsMapData>("/map"),
 
   regions: () => request<RegionOverview[]>("/regions"),
+  availabilityHistory: (regionId?: string, hours = 24) =>
+    request<AvailabilityPoint[]>(`/regions/history${query({ regionId, hours: String(hours) })}`),
 
   alerts: () => request<Alert[]>("/alerts"),
   acknowledgeAlert: (id: string) => request<Alert>(`/alerts/${id}/acknowledge`, json("POST", {})),

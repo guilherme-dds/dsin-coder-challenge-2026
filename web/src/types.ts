@@ -167,6 +167,18 @@ export interface RegionOverview {
   health: HealthLevel;
 }
 
+/** Registro do histórico de disponibilidade (cidade ou região). */
+export interface AvailabilityPoint {
+  takenAt: string;
+  total: number;
+  installed: number;
+  operational: number;
+  unavailable: number;
+  activeAgents: number;
+  openAlerts: number;
+  availability: number;
+}
+
 export interface TelemetryReading {
   receivedAt: string;
   metrics: Record<string, number>;

@@ -57,7 +57,8 @@ docker compose up -d --build   # web em http://localhost:8080 e API em http://lo
   Pendente e Inativo, com os críticos pulsando. Por situação: operacional, mau funcionamento, em manutenção,
   desativado, furtado, não instalado e baixado, cada um com sua cor.
 - **Sem comunicação à vista**: equipamento sem telemetria há mais de 10 min (ou agente sem sinal) ganha uma marca
-  vermelha no canto do pino; agentes em pausa aparecem esmaecidos.
+  vermelha no canto do pino e, se estiver "operacional", sobe para urgência **Alerta**: é a falha silenciosa, que
+  ninguém registrou mas o dispositivo denuncia ao parar de responder. Agentes em pausa aparecem esmaecidos.
 - **Painel de alertas**: fila dos alertas abertos, dos mais graves para os mais leves, com filtro por gravidade.
   Alertas novos piscam ao chegar e o botão de alertas pulsa enquanto houver alerta crítico não reconhecido. Clicar
   no alerta leva ao equipamento ou agente (ou enquadra a região); o operador pode reconhecê-lo ali mesmo.
@@ -68,6 +69,17 @@ docker compose up -d --build   # web em http://localhost:8080 e API em http://lo
 - **Ficha lateral** ao clicar em um ponto: situação, comunicação e último contato, órgão, características, última
   leitura de telemetria e ação rápida de mudança de situação. Para agentes, situação em campo e última posição.
 - **Cadastrar no mapa**: clique no local e o formulário abre com as coordenadas preenchidas.
+
+## Indicadores
+
+- **Disponibilidade da rede** (operando e comunicando ÷ instalados), operacionais, indisponíveis, agentes em
+  atividade e alertas abertos, com o nível de saúde da cidade.
+- **Regiões da cidade**: um card por região, das que exigem atenção para as normais, com disponibilidade, equipamentos
+  sem comunicação, agentes em atividade e alertas por gravidade. Clicar abre o mapa já filtrado na região.
+- **Disponibilidade nas últimas 24 h**, da cidade ou de uma região, com os limites de atenção (80%) e crítico (60%).
+  Períodos sem registro (API fora do ar) aparecem como buraco na linha, sem interpolar o que não se sabe.
+- **Fila de atendimento** com o motivo de cada equipamento estar nela (manutenção imediata, sem comunicação há X,
+  manutenção vencida), **equipes em campo** por situação e a composição da rede por situação, comunicação e tipo.
 
 ## Estrutura
 
@@ -105,7 +117,9 @@ web/
 - **Motor de alertas**: a cada 30 s (e logo após cada mudança feita pelo operador) as regras são reavaliadas sobre o
   estado da cidade: furto, falha reportada, equipamento sem comunicação, manutenção vencida ou próxima, agente sem
   sinal, leitura de telemetria fora dos limites e região com disponibilidade abaixo de 80%. O alerta abre sozinho, muda de gravidade se a situação piorar e
-  se resolve sozinho quando a condição deixa de existir; o operador apenas o reconhece.
+  se resolve sozinho quando a condição deixa de existir; o operador apenas o reconhece. Nos 2 primeiros minutos após
+  a API subir, as regras que dependem do silêncio dos dispositivos ficam congeladas, para que a volta de uma parada
+  não pareça a cidade inteira sem comunicação.
 - **Disponibilidade real**: conta os equipamentos instalados que estão operando _e_ comunicando. Um equipamento
   "operacional" que parou de enviar telemetria conta como indisponível, mesmo que ninguém tenha registrado a falha.
 - **Visão por região**: os bairros são agrupados em regiões, e cada região recebe um nível de saúde: _crítico_ (alerta

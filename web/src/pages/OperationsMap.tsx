@@ -1,5 +1,5 @@
-import { useMemo, useState, type CSSProperties } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   BellRing,
   CalendarClock,
@@ -71,6 +71,7 @@ const agentSilent = (a: Agent, now: number) =>
 
 export function OperationsMap() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const now = useNow(1000);
   const { data, error, updatedAt, reload } = useAsync(api.operationsMap, [], { refreshMs: REFRESH_MS });
   const alertsQuery = useAsync(api.alerts, [], { refreshMs: REFRESH_MS });
@@ -78,7 +79,8 @@ export function OperationsMap() {
   // Filtros
   const [q, setQ] = useState("");
   const [district, setDistrict] = useState("");
-  const [region, setRegion] = useState("");
+  // Vindo do card de região dos indicadores (?regiao=CODIGO), o mapa já abre filtrado.
+  const [region, setRegion] = useState(() => searchParams.get("regiao") ?? "");
   const [agency, setAgency] = useState<Agency | "">("");
   const [status, setStatus] = useState<EquipmentStatus | "">("");
   const [connectivity, setConnectivity] = useState<Connectivity | "">("");
@@ -232,6 +234,14 @@ export function OperationsMap() {
     const lng = points.reduce((sum, e) => sum + e.longitude, 0) / points.length;
     setFocus([lat, lng, 14]);
   };
+
+  // Enquadra a região da URL assim que os pontos chegam (uma vez só).
+  const framedFromUrl = useRef(false);
+  useEffect(() => {
+    if (framedFromUrl.current || !data || !searchParams.get("regiao")) return;
+    framedFromUrl.current = true;
+    chooseRegion(searchParams.get("regiao")!);
+  }, [data]);
 
   const acknowledge = async (alert: Alert) => {
     await api.acknowledgeAlert(alert.id);

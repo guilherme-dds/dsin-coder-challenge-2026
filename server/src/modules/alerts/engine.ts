@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
+import { inStartupGrace } from "../../lib/uptime.js";
 import type { AlertKind, AlertSeverity } from "../../domain/alerts.js";
 import {
   REGION_CRITICAL_PCT,
@@ -14,7 +15,10 @@ import { loadRegionIndex } from "../regions/service.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const UPCOMING_WINDOW_DAYS = 7;
-const ENGINE_INTERVAL_MS = 30 * 1000;
+export const ENGINE_INTERVAL_MS = 30 * 1000;
+
+/** Regras que dependem de os dispositivos estarem reportando (a disponibilidade da região inclusive). */
+const SILENCE_KINDS: AlertKind[] = ["EQUIPAMENTO_OFFLINE", "AGENTE_SEM_SINAL", "REGIAO_DEGRADADA"];
 
 interface AlertCandidate {
   kind: AlertKind;
@@ -150,7 +154,10 @@ async function collectCandidates(now: Date): Promise<AlertCandidate[]> {
  * e resolve automaticamente aqueles cuja condição deixou de existir.
  */
 export async function evaluateAlerts(now = new Date()) {
-  const candidates = await collectCandidates(now);
+  // Na carência de partida, regras que dependem do silêncio dos dispositivos ficam congeladas:
+  // não abrem alertas novos nem resolvem os que já estavam abertos.
+  const grace = inStartupGrace();
+  const candidates = (await collectCandidates(now)).filter((c) => !grace || !SILENCE_KINDS.includes(c.kind));
   const open = await prisma.alert.findMany({ where: { status: { not: "RESOLVIDO" } } });
   const openByKey = new Map(open.map((a) => [a.dedupKey, a]));
   const wanted = new Set<string>();
@@ -176,7 +183,9 @@ export async function evaluateAlerts(now = new Date()) {
     }
   }
 
-  const cleared = open.filter((a) => !wanted.has(a.dedupKey)).map((a) => a.id);
+  const cleared = open
+    .filter((a) => !wanted.has(a.dedupKey) && !(grace && SILENCE_KINDS.includes(a.kind as AlertKind)))
+    .map((a) => a.id);
   if (cleared.length) {
     operations.push(
       prisma.alert.updateMany({ where: { id: { in: cleared } }, data: { status: "RESOLVIDO", resolvedAt: now } }),

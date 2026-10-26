@@ -12,16 +12,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 type EquipmentWithType = Equipment & { type: EquipmentType };
 
 export function toEquipmentDto(equipment: EquipmentWithType) {
+  const status = equipment.status as EquipmentStatus;
+  const link = connectivity(status, equipment.lastSeenAt);
   return {
     ...equipment,
     type: toTypeDto(equipment.type),
     attributes: JSON.parse(equipment.attributes) as Record<string, unknown>,
     urgency: urgency({
-      status: equipment.status as EquipmentStatus,
+      status,
       maintenanceType: equipment.maintenanceType as MaintenanceType,
       nextMaintenanceAt: equipment.nextMaintenanceAt,
+      connectivity: link,
     }),
-    connectivity: connectivity(equipment.status as EquipmentStatus, equipment.lastSeenAt),
+    connectivity: link,
   };
 }
 

@@ -1,4 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
+import { graceRemainingMs, inStartupGrace } from "../../lib/uptime.js";
+import { ENGINE_INTERVAL_MS } from "../alerts/engine.js";
 import { buildOverview } from "./service.js";
 
 const SNAPSHOT_INTERVAL_MS = 15 * 60 * 1000;
@@ -25,6 +27,10 @@ export async function takeSnapshot(now = new Date()) {
 export async function startSnapshotJob() {
   const run = () => takeSnapshot().catch((err) => console.error("Falha ao registrar disponibilidade:", err));
   const last = await prisma.availabilitySnapshot.findFirst({ where: { regionId: null }, orderBy: { takenAt: "desc" } });
-  if (!last || Date.now() - last.takenAt.getTime() >= SNAPSHOT_INTERVAL_MS) run();
+  if (!last || Date.now() - last.takenAt.getTime() >= SNAPSHOT_INTERVAL_MS) {
+    // Espera a carência de partida e mais um ciclo do motor de alertas, para a fotografia já refletir
+    // os dispositivos reportando (e não a cidade inteira "em silêncio" desde a última vez no ar).
+    setTimeout(run, inStartupGrace() ? graceRemainingMs() + ENGINE_INTERVAL_MS : 0);
+  }
   return setInterval(run, SNAPSHOT_INTERVAL_MS);
 }

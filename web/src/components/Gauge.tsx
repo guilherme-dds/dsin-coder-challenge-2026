@@ -26,9 +26,9 @@ export function Gauge({ value, color, label }: { value: number; color: string; l
   );
 }
 
-/** Cor do indicador de disponibilidade da rede. */
+/** Cor do indicador de disponibilidade, com os mesmos limites da saúde das regiões (80% e 60%). */
 export function availabilityColor(percent: number) {
   if (percent >= 80) return "var(--state-green)";
-  if (percent >= 50) return "var(--state-yellow)";
+  if (percent >= 60) return "var(--state-yellow)";
   return "var(--state-red)";
 }

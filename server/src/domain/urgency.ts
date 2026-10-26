@@ -1,3 +1,4 @@
+import type { Connectivity } from "./connectivity.js";
 import type { EquipmentStatus, MaintenanceType } from "./status.js";
 
 /**
@@ -15,14 +16,18 @@ interface UrgencyInput {
   status: EquipmentStatus;
   maintenanceType: MaintenanceType;
   nextMaintenanceAt: Date | null;
+  connectivity?: Connectivity;
 }
 
 export function urgency(input: UrgencyInput, now = new Date()): UrgencyLevel {
-  const { status, maintenanceType, nextMaintenanceAt } = input;
+  const { status, maintenanceType, nextMaintenanceAt, connectivity } = input;
 
   if (status === "FURTADO" || status === "DESATIVADO" || status === "BAIXADO") return "INATIVO";
   if (status === "NAO_INSTALADO") return "PENDENTE";
   if (status === "MAU_FUNCIONAMENTO" || maintenanceType === "IMEDIATA") return "CRITICO";
+  // A falha silenciosa: ninguém registrou problema, mas o dispositivo parou de responder.
+  // Em manutenção é normal ficar desligado, então não conta.
+  if (connectivity === "OFFLINE" && status !== "EM_MANUTENCAO") return "ALERTA";
   if (nextMaintenanceAt && nextMaintenanceAt.getTime() < now.getTime()) return "ALERTA";
   if (status === "EM_MANUTENCAO") return "ATENCAO";
   if (nextMaintenanceAt && nextMaintenanceAt.getTime() - now.getTime() <= UPCOMING_WINDOW_DAYS * DAY_MS) {
