@@ -1,10 +1,11 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Activity, ChartColumn, Flame, Map as MapIcon, Radio, Users } from "lucide-react";
+import { Activity, ChartColumn, Flame, Map as MapIcon, Radio, Telescope, Users } from "lucide-react";
 import { useNow } from "../hooks";
 
 const links = [
   { to: "/", label: "Mapa operacional", hint: "Visão da cidade em tempo real", icon: MapIcon, end: true },
   { to: "/indicadores", label: "Indicadores", hint: "Disponibilidade e regiões", icon: ChartColumn },
+  { to: "/previsoes", label: "Previsões", hint: "Risco, falhas e tendências", icon: Telescope },
   { to: "/equipamentos", label: "Equipamentos", hint: "Inventário completo", icon: Radio },
   { to: "/agentes", label: "Agentes", hint: "Trânsito, GM e PM", icon: Users },
 ];

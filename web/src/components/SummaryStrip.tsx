@@ -4,7 +4,8 @@ import type { IndicatorShape } from "../labels";
 export interface SummaryItem {
   key: string;
   label: string;
-  count: number;
+  /** Número já formatado quando for decimal (ex.: "1,9"). */
+  count: number | string;
   color?: string;
   shape?: IndicatorShape;
 }

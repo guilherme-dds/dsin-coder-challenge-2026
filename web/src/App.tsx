@@ -2,6 +2,7 @@ import { Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { OperationsMap } from "./pages/OperationsMap";
 import { Indicators } from "./pages/Indicators";
+import { Predictions } from "./pages/Predictions";
 import { EquipmentList } from "./pages/EquipmentList";
 import { EquipmentForm } from "./pages/EquipmentForm";
 import { EquipmentSheet } from "./pages/EquipmentSheet";
@@ -14,6 +15,7 @@ export function App() {
       <Route element={<Layout />}>
         <Route index element={<OperationsMap />} />
         <Route path="indicadores" element={<Indicators />} />
+        <Route path="previsoes" element={<Predictions />} />
         <Route path="equipamentos" element={<EquipmentList />} />
         <Route path="equipamentos/novo" element={<EquipmentForm />} />
         <Route path="equipamentos/:id" element={<EquipmentSheet />} />

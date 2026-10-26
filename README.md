@@ -100,6 +100,23 @@ docker compose up -d --build   # web em http://localhost:8080 e API em http://lo
 Toda previsão responde com um bloco `about`: o que está sendo previsto, quais dados foram considerados, como o
 cálculo é feito e como usar o resultado.
 
+### Tela de Previsões
+
+A tela **Previsões** abre com um resumo (regiões com risco alto em 24 h, agentes a reforçar no turno, falhas
+esperadas na semana, equipamentos fora do padrão e tendências de piora) e três abas, para não mostrar tudo de uma vez:
+
+- **Risco e reforço**: cada região numa faixa de 24 horas colorida pelo nível de risco. Clicar na região mostra o
+  pico, a chance de ocorrência e os fatores que pesaram. Ao lado, a **semana típica** (dia × hora, da cidade ou de
+  uma região) e o **reforço por turno** (agentes necessários / escalados, com a sugestão de remanejamento).
+- **Manutenção preditiva**: equipamentos ordenados pela chance de falhar em 7 dias, com o motivo principal e a ação
+  recomendada, mais a lista de equipamentos fora do padrão.
+- **Tendências**: regiões com disponibilidade caindo (as estáveis ficam numa linha só), ocorrências por semana das
+  últimas 12 semanas e equipamentos com uso em alta ou em queda.
+
+Cada bloco tem um **"Como esta previsão funciona"** recolhível, com o que é previsto, os dados considerados, o cálculo
+e como a previsão ajuda na decisão. No **mapa operacional**, a camada **"Risco previsto agora"** desenha cada região
+na cor do seu nível de risco.
+
 ### Risco por região e horário
 
 - **O que prevê**: o risco de ocorrências em cada região, hora a hora, para as próximas horas (até 72 h), e os dias

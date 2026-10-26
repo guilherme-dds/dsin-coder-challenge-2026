@@ -187,7 +187,8 @@ export async function predictFailures(days = 7, now = new Date()) {
       const multiplier = factors.reduce((product, f) => product * f.multiplier, 1);
       const probability = Math.min(0.95, 1 - Math.exp(-base * days * multiplier));
       const level: FailureLevel = probability >= 0.5 ? "ALTA" : probability >= 0.2 ? "MEDIA" : "BAIXA";
-      factors.sort((a, b) => b.multiplier - a.multiplier);
+      // O motivo principal é o mais acionável (o que define a ação); empate pelo maior multiplicador
+      factors.sort((a, b) => actionRank(a.label) - actionRank(b.label) || b.multiplier - a.multiplier);
 
       return {
         equipment: {
@@ -228,6 +229,11 @@ const ACTIONS: [string, string][] = [
   ["Instabilidade recente", "Verificar alimentação e conexão do dispositivo."],
   ["Bairro com mais falhas", "Reforçar a proteção física e a vistoria no bairro."],
 ];
+
+function actionRank(label: string) {
+  const index = ACTIONS.findIndex(([action]) => action === label);
+  return index === -1 ? ACTIONS.length : index;
+}
 
 function recommend(factors: FailureFactor[]) {
   const action = ACTIONS.find(([label]) => factors.some((f) => f.label === label));

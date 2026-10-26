@@ -2415,6 +2415,316 @@ tr.clickable:hover td {
 }
 
 /* ==========================================================================
+   Previsões
+   ========================================================================== */
+
+.predict-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.predict-grid > .card {
+  margin-bottom: 0;
+}
+
+.span-2 {
+  grid-column: span 2;
+}
+
+.span-3 {
+  grid-column: 1 / -1;
+}
+
+.card-sub {
+  margin: 10px 0 0;
+  font-size: 0.8rem;
+}
+
+.padded {
+  padding: 16px 20px;
+}
+
+.card-header.padded {
+  margin-bottom: 0;
+}
+
+h3 {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+/* "Como esta previsão funciona" */
+.disclosure.how {
+  margin-top: var(--space-4);
+}
+
+.how-list {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 0.84rem;
+}
+
+.how-list dt {
+  color: var(--muted);
+}
+
+.how-list dd {
+  margin: 0;
+  color: var(--text-2);
+}
+
+.how-list ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* Risco por região × hora: uma faixa de 24 células por região */
+.risk-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.risk-row {
+  display: grid;
+  grid-template-columns: 150px repeat(24, minmax(0, 1fr));
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.risk-row:hover,
+.risk-row.on {
+  background: var(--hover);
+}
+
+.risk-row.on .risk-name {
+  font-weight: 600;
+}
+
+.risk-head {
+  cursor: default;
+}
+
+.risk-head:hover {
+  background: none;
+}
+
+.risk-hour {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.risk-name {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.84rem;
+}
+
+.risk-name small {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.risk-cell {
+  height: 22px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--cell-color) 70%, var(--panel));
+}
+
+.risk-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 10px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--cell-color) 70%, var(--panel));
+}
+
+.risk-legend {
+  font-size: 0.78rem;
+}
+
+.region-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.factor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.84rem;
+}
+
+.factor-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.factor-list span {
+  color: var(--text-2);
+}
+
+/* Semana típica: dia da semana × hora, um tom só do mais claro ao mais forte */
+.week-heatmap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.week-row {
+  display: grid;
+  grid-template-columns: 30px repeat(24, minmax(0, 1fr));
+  gap: 2px;
+  align-items: center;
+}
+
+.week-day,
+.week-hours span {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.week-cell {
+  height: 16px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--high) var(--intensity), var(--panel-raised));
+}
+
+.scale-legend {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 0.72rem;
+}
+
+.scale-legend i {
+  height: 6px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, var(--panel-raised), var(--high));
+}
+
+.staffing-list,
+.trend-list,
+.anomaly-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-3);
+}
+
+.staffing-list li,
+.trend-list li,
+.anomaly-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.84rem;
+}
+
+.staffing-list li:last-child,
+.trend-list li:last-child,
+.anomaly-list li:last-child {
+  border-bottom: none;
+}
+
+.staffing-top,
+.trend-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Probabilidade de falha: número + barra */
+.prob {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.prob .mono {
+  width: 36px;
+  text-align: right;
+}
+
+.prob-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.prob-bar i {
+  display: block;
+  height: 100%;
+}
+
+/* Ocorrências das últimas 12 semanas: barras pequenas, sem eixo */
+.weekly-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 24px;
+}
+
+.weekly-bars i {
+  width: 6px;
+  min-height: 2px;
+  border-radius: 1px 1px 0 0;
+  background: var(--text-2);
+}
+
+@media (max-width: 1200px) {
+  .predict-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .predict-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .span-2 {
+    grid-column: auto;
+  }
+  .region-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .risk-row {
+    grid-template-columns: 96px repeat(24, minmax(0, 1fr));
+  }
+  .how-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ==========================================================================
    Animações: só as que carregam informação
    ========================================================================== */
 

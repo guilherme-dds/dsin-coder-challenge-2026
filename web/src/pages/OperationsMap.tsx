@@ -19,7 +19,8 @@ import {
   maintenanceDue,
   timeAgo,
 } from "../labels";
-import { CityMap, type MapMarker } from "../components/CityMap";
+import { CityMap, type MapMarker, type MapZone } from "../components/CityMap";
+import { RISK_LABELS, predictionsApi, type RiskLevel } from "../predictions";
 import { AlertsPanel } from "../components/AlertsPanel";
 import { ConnectivityBadge, FieldStatusBadge, Shape, StatusBadge, UrgencyBadge } from "../components/Badges";
 import { TypeIcon } from "../components/TypeIcon";
@@ -40,6 +41,10 @@ const ROLE_AGENCY: Record<Agent["role"], Agency> = {
 };
 
 const IN_ACTIVITY: Agent["fieldStatus"][] = ["DISPONIVEL", "EM_ATENDIMENTO", "EM_DESLOCAMENTO"];
+
+/** Mesmas cores dos níveis de risco da tela de previsões, em hex para o Leaflet. */
+const RISK_HEX: Record<RiskLevel, string> = { ALTO: "#ef7d1a", MODERADO: "#d9b31c", BAIXO: "#8d939e" };
+const METERS_PER_DEGREE = 111_000;
 
 type ColorMode = "urgency" | "status";
 type Selection = { kind: "equipment" | "agent"; id: string } | null;
@@ -69,6 +74,11 @@ export function OperationsMap() {
   const [showEquipments, setShowEquipments] = useState(true);
   const [showAgents, setShowAgents] = useState(true);
   const [showHeat, setShowHeat] = useState(false);
+  const [showRisk, setShowRisk] = useState(false);
+  // A previsão só é buscada com a camada ligada
+  const riskQuery = useAsync(() => (showRisk ? predictionsApi.risk(3) : Promise.resolve(null)), [showRisk], {
+    refreshMs: 5 * 60_000,
+  });
   const [colorMode, setColorMode] = useState<ColorMode>("urgency");
   const [showAlerts, setShowAlerts] = useState(true);
   // O mapa abre limpo: filtros e legenda ficam a um clique.
@@ -82,6 +92,28 @@ export function OperationsMap() {
   const equipments = data?.equipments ?? [];
   const agents = data?.agents ?? [];
   const regions = data?.regions ?? [];
+
+  // Risco previsto agora em cada região, desenhado no centro dos equipamentos dela
+  const riskZones = useMemo<MapZone[]>(() => {
+    if (!showRisk || !riskQuery.data) return [];
+    return riskQuery.data.regions.flatMap(({ region, now }) => {
+      const points = equipments.filter((e) => e.regionCode === region.code);
+      if (!points.length) return [];
+      const lat = points.reduce((sum, e) => sum + e.latitude, 0) / points.length;
+      const lng = points.reduce((sum, e) => sum + e.longitude, 0) / points.length;
+      const spread = Math.max(...points.map((e) => Math.hypot(e.latitude - lat, e.longitude - lng))) * METERS_PER_DEGREE;
+      return [
+        {
+          id: region.id,
+          latitude: lat,
+          longitude: lng,
+          radius: Math.min(1800, Math.max(600, spread)),
+          color: RISK_HEX[now.level],
+          label: `${region.name} · risco ${RISK_LABELS[now.level].toLowerCase()} agora (${now.riskIndex})`,
+        },
+      ];
+    });
+  }, [showRisk, riskQuery.data, equipments]);
   const alerts = alertsQuery.data ?? [];
 
   const typeOptions = useMemo(() => {
@@ -414,6 +446,10 @@ export function OperationsMap() {
               <input type="checkbox" checked={showHeat} onChange={(e) => setShowHeat(e.target.checked)} />
               <span className="track" /> Calor de falhas
             </label>
+            <label className="switch">
+              <input type="checkbox" checked={showRisk} onChange={(e) => setShowRisk(e.target.checked)} />
+              <span className="track" /> Risco previsto agora
+            </label>
           </div>
           {showHeat && (
             <div className="heat-scale">
@@ -459,6 +495,7 @@ export function OperationsMap() {
           zoom={14}
           markers={markers}
           heat={showHeat ? data?.failures : undefined}
+          zones={riskZones}
           selectedId={selection?.id}
           focus={focus}
           picking={picking}

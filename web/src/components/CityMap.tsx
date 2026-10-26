@@ -1,13 +1,24 @@
 import { useEffect, useMemo, type CSSProperties, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import L from "leaflet";
-import { MapContainer, Marker, TileLayer, Tooltip, ZoomControl, useMap, useMapEvents } from "react-leaflet";
+import { Circle, MapContainer, Marker, TileLayer, Tooltip, ZoomControl, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { TypeIcon } from "./TypeIcon";
 import { HeatLayer } from "./HeatLayer";
 import type { FailurePoint } from "../types";
 
 export const DEFAULT_CENTER: [number, number] = [-22.2139, -49.9458]; // Marília/SP
+
+export interface MapZone {
+  id: string;
+  latitude: number;
+  longitude: number;
+  /** Raio em metros. */
+  radius: number;
+  /** Cor em hex (o Leaflet não resolve variáveis CSS). */
+  color: string;
+  label: string;
+}
 
 export interface MapMarker {
   id: string;
@@ -33,6 +44,8 @@ interface Props {
   center?: [number, number];
   zoom?: number;
   heat?: FailurePoint[];
+  /** Áreas destacadas sob os pinos (ex.: risco previsto por região). */
+  zones?: MapZone[];
   selectedId?: string | null;
   /** Ponto para onde o mapa voa; o terceiro valor, opcional, fixa o zoom (ex.: enquadrar uma região). */
   focus?: [number, number] | [number, number, number] | null;
@@ -93,6 +106,7 @@ export function CityMap({
   center = DEFAULT_CENTER,
   zoom = 13,
   heat,
+  zones,
   selectedId,
   focus,
   picking,
@@ -113,6 +127,16 @@ export function CityMap({
         <ZoomControl position="bottomright" />
         <FitContainer />
         {heat && heat.length > 0 && <HeatLayer points={heat} />}
+        {zones?.map((z) => (
+          <Circle
+            key={z.id}
+            center={[z.latitude, z.longitude]}
+            radius={z.radius}
+            pathOptions={{ color: z.color, weight: 1.5, fillColor: z.color, fillOpacity: 0.18 }}
+          >
+            <Tooltip direction="center">{z.label}</Tooltip>
+          </Circle>
+        ))}
         {onMapClick && <ClickHandler onMapClick={onMapClick} />}
         {focus && <FlyTo focus={focus} />}
         {ordered.map((m) => (
