@@ -1,6 +1,17 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Prisma } from "@prisma/client";
 import type { AttributeField } from "../src/domain/dynamic-attributes.js";
 import { sampleMetrics } from "../src/domain/telemetry.js";
+import { AGENTS_BY_SEVERITY, HANDLING_MINUTES, OCCURRENCE_KINDS } from "../src/domain/occurrences.js";
+import { cityDayStart, cityTime, cityWeekday } from "../src/domain/time.js";
+import {
+  DISTRICT_COORDS,
+  OCCURRENCE_NOTES,
+  applyDegradation,
+  expectedPerHour,
+  pickSeverity,
+  poisson,
+  weekdayFlowFactor,
+} from "../scripts/city-profile.js";
 
 const prisma = new PrismaClient();
 
@@ -272,7 +283,101 @@ function lastSeenFor(status: string) {
 
 const UNAVAILABLE = ["MAU_FUNCIONAMENTO", "EM_MANUTENCAO", "DESATIVADO", "FURTADO"];
 
+/** Quanto histórico de exemplo é gerado para as previsões. */
+const OCCURRENCE_HISTORY_DAYS = 90;
+const TELEMETRY_HISTORY_DAYS = 60;
+const AVAILABILITY_HISTORY_HOURS = 7 * 24;
+
+/** Dispositivos nessas situações não transmitem, então não têm histórico de telemetria. */
+const SILENT_STATUSES = ["NAO_INSTALADO", "DESATIVADO", "FURTADO", "BAIXADO"];
+/** Medições de fluxo, que caem no fim de semana. */
+const FLOW_METRICS = ["veiculosHora", "aberturasHora", "transacoesHora", "pesagensHora"];
+
+interface SeededEquipment {
+  id: string;
+  serialNumber: string;
+  type: string;
+  status: string;
+  district: string;
+}
+
+/**
+ * 90 dias de ocorrências sorteadas hora a hora a partir do perfil da cidade (scripts/city-profile.ts).
+ * As previsões só enxergam o resultado, nunca o perfil.
+ */
+async function seedOccurrences(regionIds: Record<string, string>, equipments: SeededEquipment[], now: Date) {
+  const rows: Prisma.OccurrenceCreateManyInput[] = [];
+  for (let daysAgo = OCCURRENCE_HISTORY_DAYS; daysAgo >= 0; daysAgo--) {
+    const weekday = cityWeekday(cityTime(now, daysAgo, 12));
+    for (let hour = 0; hour < 24; hour++) {
+      const slotStart = cityTime(now, daysAgo, hour);
+      if (slotStart > now) break;
+      for (const region of REGIONS) {
+        for (const kind of OCCURRENCE_KINDS) {
+          const count = poisson(expectedPerHour(region.code, kind, hour, weekday, daysAgo), random);
+          for (let i = 0; i < count; i++) {
+            const occurredAt = new Date(slotStart.getTime() + random() * 60 * MINUTE_MS);
+            if (occurredAt > now) continue;
+            const district = pick(region.districts);
+            const [lat, lng] = DISTRICT_COORDS[district];
+            const severity = pickSeverity(kind, random);
+            const resolvedAt = new Date(occurredAt.getTime() + HANDLING_MINUTES[kind] * (0.5 + random()) * MINUTE_MS);
+            // Parte do vandalismo atinge equipamentos do próprio bairro
+            const target = kind === "VANDALISMO" && random() < 0.3 ? pick(equipments.filter((e) => e.district === district)) : undefined;
+            rows.push({
+              kind,
+              severity,
+              district,
+              regionId: regionIds[region.code],
+              latitude: lat + (random() - 0.5) * 0.01,
+              longitude: lng + (random() - 0.5) * 0.01,
+              occurredAt,
+              resolvedAt: resolvedAt > now ? null : resolvedAt,
+              agentsDispatched: AGENTS_BY_SEVERITY[severity],
+              equipmentId: target?.id ?? null,
+              note: pick(OCCURRENCE_NOTES[kind]),
+            });
+          }
+        }
+      }
+    }
+  }
+  await prisma.occurrence.createMany({ data: rows });
+  return rows.length;
+}
+
+/** 60 dias de resumos diários de telemetria, com as histórias de degradação aplicadas. */
+async function seedTelemetryDaily(equipments: SeededEquipment[], now: Date) {
+  const rows: Prisma.TelemetryDailyCreateManyInput[] = [];
+  for (const e of equipments) {
+    if (SILENT_STATUSES.includes(e.status)) continue;
+    for (let daysAgo = TELEMETRY_HISTORY_DAYS; daysAgo >= 1; daysAgo--) {
+      const noon = cityTime(now, daysAgo, 12);
+      const flow = weekdayFlowFactor(cityWeekday(noon));
+      const samples = Array.from({ length: 8 }, () => applyDegradation(e.serialNumber, sampleMetrics(e.type, random), daysAgo));
+      for (const metric of Object.keys(samples[0])) {
+        const values = samples.map((sample) => (FLOW_METRICS.includes(metric) ? Math.round(sample[metric] * flow) : sample[metric]));
+        rows.push({
+          equipmentId: e.id,
+          date: cityDayStart(noon),
+          metric,
+          avg: Math.round((values.reduce((sum, v) => sum + v, 0) / values.length) * 10) / 10,
+          min: Math.min(...values),
+          max: Math.max(...values),
+          // Um dia de leituras a cada 10 s
+          samples: 8640,
+        });
+      }
+    }
+  }
+  await prisma.telemetryDaily.createMany({ data: rows });
+  return rows.length;
+}
+
 async function main() {
+  const now = new Date();
+  await prisma.occurrence.deleteMany();
+  await prisma.telemetryDaily.deleteMany();
   await prisma.alert.deleteMany();
   await prisma.availabilitySnapshot.deleteMany();
   await prisma.telemetryReading.deleteMany();
@@ -417,6 +522,7 @@ async function main() {
   ];
 
   const all: SeedEquipment[] = [...equipments, ...generateNetwork()];
+  const seeded: SeededEquipment[] = [];
   let failureEvents = 0;
 
   for (const { type, responsible, attributes, ...e } of all) {
@@ -439,7 +545,7 @@ async function main() {
         }))
       : [];
 
-    await prisma.equipment.create({
+    const created = await prisma.equipment.create({
       data: {
         ...e,
         city: "Marília",
@@ -458,24 +564,34 @@ async function main() {
         },
       },
     });
+    seeded.push({ id: created.id, serialNumber: e.serialNumber, type, status: e.status, district: e.district });
   }
 
+  const occurrences = await seedOccurrences(regionIds, seeded, now);
+  const dailyMetrics = await seedTelemetryDaily(seeded, now);
+
   const activeAgents = Object.values(FIELD_STATUS_BY_AGENT).filter((s) => s !== "EM_PAUSA" && s !== "SEM_SINAL").length;
-  const scopes: { regionId: string | null; items: SeedEquipment[] }[] = [
-    { regionId: null, items: all },
-    ...REGIONS.map((r) => ({ regionId: regionIds[r.code], items: all.filter((e) => regionOfDistrict[e.district] === r.code) })),
+  const scopes: { regionId: string | null; code: string | null; items: SeedEquipment[] }[] = [
+    { regionId: null, code: null, items: all },
+    ...REGIONS.map((r) => ({
+      regionId: regionIds[r.code],
+      code: r.code,
+      items: all.filter((e) => regionOfDistrict[e.district] === r.code),
+    })),
   ];
-  const snapshots = scopes.flatMap(({ regionId, items }) => {
+  const snapshots = scopes.flatMap(({ regionId, code, items }) => {
     const total = items.length;
     const installed = items.filter((e) => e.status !== "NAO_INSTALADO" && e.status !== "BAIXADO").length;
     const unavailableNow = items.filter((e) => UNAVAILABLE.includes(e.status)).length;
-    return Array.from({ length: 24 }, (_, h) => {
+    return Array.from({ length: AVAILABILITY_HISTORY_HOURS }, (_, h) => {
       // Oscilação ao longo do dia, com pico de indisponibilidade no fim da tarde
       const swing = Math.round((Math.sin((h / 24) * Math.PI * 2) + random() - 0.5) * Math.max(1, installed * 0.06));
-      const unavailable = Math.min(installed, Math.max(0, unavailableNow + swing));
+      // A Zona Sul vem perdendo equipamentos ao longo da semana (tendência para as previsões)
+      const decline = code === "SUL" ? Math.round(2 * (1 - h / AVAILABILITY_HISTORY_HOURS)) : 0;
+      const unavailable = Math.min(installed, Math.max(0, unavailableNow + swing - decline));
       return {
         regionId,
-        takenAt: new Date(Date.now() - (24 - h) * 60 * MINUTE_MS),
+        takenAt: new Date(now.getTime() - (AVAILABILITY_HISTORY_HOURS - h) * 60 * MINUTE_MS),
         total,
         installed,
         operational: installed - unavailable,
@@ -488,7 +604,7 @@ async function main() {
   await prisma.availabilitySnapshot.createMany({ data: snapshots });
 
   console.log(
-    `Seed concluído: ${types.length} tipos, ${agents.length} agentes, ${all.length} equipamentos, ${failureEvents} falhas históricas, ${REGIONS.length} regiões, ${snapshots.length} registros de disponibilidade.`,
+    `Seed concluído: ${types.length} tipos, ${agents.length} agentes, ${all.length} equipamentos, ${failureEvents} falhas históricas, ${REGIONS.length} regiões, ${snapshots.length} registros de disponibilidade, ${occurrences} ocorrências em ${OCCURRENCE_HISTORY_DAYS} dias, ${dailyMetrics} resumos diários de telemetria.`,
   );
 }
 

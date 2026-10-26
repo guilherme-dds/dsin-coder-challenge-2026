@@ -65,11 +65,13 @@ model Equipment {
   responsibleAgentId String?
   responsibleAgent   Agent?  @relation(fields: [responsibleAgentId], references: [id])
 
-  events    EquipmentEvent[]
-  readings  TelemetryReading[]
-  alerts    Alert[]
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  events      EquipmentEvent[]
+  readings    TelemetryReading[]
+  daily       TelemetryDaily[]
+  alerts      Alert[]
+  occurrences Occurrence[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([status])
   @@index([district])
@@ -150,12 +152,13 @@ model AgentPosition {
 
 /// Agrupamento de bairros usado na visão consolidada da cidade.
 model Region {
-  id        String                 @id @default(cuid())
-  code      String                 @unique
-  name      String
-  districts District[]
-  alerts    Alert[]
-  snapshots AvailabilitySnapshot[]
+  id          String                 @id @default(cuid())
+  code        String                 @unique
+  name        String
+  districts   District[]
+  alerts      Alert[]
+  snapshots   AvailabilitySnapshot[]
+  occurrences Occurrence[]
 }
 
 model District {
@@ -167,17 +170,17 @@ model District {
 
 /// Alerta operacional gerado pelo motor de regras (ou por um operador).
 model Alert {
-  id        String  @id @default(cuid())
+  id       String  @id @default(cuid())
   /// Regra que gerou o alerta (ver src/domain/alerts.ts)
-  kind      String
+  kind     String
   /// CRITICA | ALTA | MEDIA | BAIXA
-  severity  String
+  severity String
   /// ABERTO | RECONHECIDO | RESOLVIDO
-  status    String  @default("ABERTO")
-  title     String
-  message   String?
+  status   String  @default("ABERTO")
+  title    String
+  message  String?
   /// Evita alertas repetidos: no máximo um alerta não resolvido por regra + origem
-  dedupKey  String
+  dedupKey String
 
   equipmentId String?
   equipment   Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
@@ -209,4 +212,49 @@ model AvailabilitySnapshot {
   openAlerts   Int
 
   @@index([regionId, takenAt])
+}
+
+/// Ocorrência operacional atendida na cidade (acidente, congestionamento, vandalismo...).
+/// É o histórico de onde saem os padrões de região, dia e horário usados nas previsões.
+model Occurrence {
+  id               String     @id @default(cuid())
+  /// Ver src/domain/occurrences.ts
+  kind             String
+  /// CRITICA | ALTA | MEDIA | BAIXA
+  severity         String
+  district         String
+  /// Região resolvida pelo bairro no momento do registro
+  regionId         String?
+  region           Region?    @relation(fields: [regionId], references: [id], onDelete: SetNull)
+  latitude         Float
+  longitude        Float
+  occurredAt       DateTime
+  resolvedAt       DateTime?
+  /// Agentes empenhados no atendimento: é o que mede a demanda sobre as equipes
+  agentsDispatched Int        @default(1)
+  /// Equipamento envolvido, quando houver (ex.: câmera vandalizada)
+  equipmentId      String?
+  equipment        Equipment? @relation(fields: [equipmentId], references: [id], onDelete: SetNull)
+  note             String?
+
+  @@index([occurredAt])
+  @@index([regionId, occurredAt])
+}
+
+/// Resumo diário de cada medição de um dispositivo. A telemetria bruta fica só 24 h no banco;
+/// este resumo guarda o histórico longo usado para tendências e manutenção preditiva.
+model TelemetryDaily {
+  id          String    @id @default(cuid())
+  equipmentId String
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  /// Início do dia no horário da cidade
+  date        DateTime
+  metric      String
+  avg         Float
+  min         Float
+  max         Float
+  samples     Int
+
+  @@unique([equipmentId, date, metric])
+  @@index([date])
 }

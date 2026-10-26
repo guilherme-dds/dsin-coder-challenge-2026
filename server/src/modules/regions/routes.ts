@@ -7,7 +7,7 @@ import { buildOverview } from "./service.js";
 const historyFilters = z.object({
   /** Sem região: histórico da cidade inteira. */
   regionId: z.string().optional(),
-  hours: z.coerce.number().int().positive().max(24 * 7).default(24),
+  hours: z.coerce.number().int().positive().max(24 * 30).default(24),
 });
 
 export const regionsRouter = Router();

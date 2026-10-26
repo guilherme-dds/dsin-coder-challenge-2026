@@ -30,8 +30,22 @@ Outros comandos úteis (rodar dentro de `server/` ou com `-w server`): `db:reset
 mesmos endpoints que o PROMETHEUS usaria (já roda junto com `npm run dev`). De tempos em tempos provoca incidentes:
 dispositivo que para de responder, leitura anômala (câmera sem imagem, totem sem papel, patinete sem bateria) e
 agente sem sinal. Três dispositivos ficam permanentemente mudos, para a falha silenciosa estar sempre visível.
-Variáveis opcionais: `API_URL` (padrão `http://localhost:3333`), `TICK_MS` (padrão `10000`) e `INCIDENT_CHANCE`
-(chance de incidente por ciclo, padrão `0.04`).
+Também registra **ocorrências** (acidentes, congestionamentos, vandalismo, furtos…) no ritmo realista da cidade, cerca
+de 19 por dia. Variáveis opcionais: `API_URL` (padrão `http://localhost:3333`), `TICK_MS` (padrão `10000`),
+`INCIDENT_CHANCE` (chance de incidente por ciclo, padrão `0.04`) e `OCCURRENCE_RATE` (multiplicador do ritmo de
+ocorrências, padrão `1`).
+
+### Histórico para as previsões
+
+A seed gera um histórico de exemplo para a parte preditiva: **90 dias de ocorrências**, **60 dias de resumos
+diários de telemetria** e **7 dias de disponibilidade por hora**. Os dados vêm de um perfil de comportamento da
+cidade ([city-profile.ts](server/scripts/city-profile.ts)), com picos nos horários de ida e volta do trabalho,
+vandalismo de madrugada e no fim de semana, uma região piorando mês a mês e alguns dispositivos se degradando aos
+poucos. **Os modelos de previsão nunca leem esse perfil**: descobrem os padrões a partir dos dados gravados, como
+fariam com dados reais. Em produção, o histórico se forma sozinho: o simulador (ou os dispositivos reais) registra
+ocorrências, e a API consolida a telemetria em resumos diários de hora em hora, antes que a retenção de 24 h a apague.
+Para recriar o histórico num banco Docker já existente: `SEED_ON_START=true docker compose up -d server` (apaga os
+dados atuais).
 
 ### Com Docker
 
@@ -153,6 +167,9 @@ web/
 | POST   | `/api/agents`                     | Cadastra agente (com posição no mapa)       |
 | PUT    | `/api/agents/:id`                 | Atualiza agente                             |
 | POST   | `/api/agents/:id/position`        | Posição do agente: `{ latitude, longitude, fieldStatus?, recordedAt? }` |
+| GET    | `/api/occurrences`                | Ocorrências. Filtros: `days` (padrão 7), `regionId`, `kind`, `open`, `limit` |
+| POST   | `/api/occurrences`                | Registra ocorrência: `{ kind, severity?, district, latitude, longitude, occurredAt?, agentsDispatched?, equipmentId?, note? }` |
+| POST   | `/api/occurrences/:id/resolve`    | Encerra a ocorrência                        |
 | GET    | `/api/agents/:id/positions`       | Trilha recente (`minutes`, padrão 30)       |
 | GET    | `/api/cep/:cep`                   | Consulta endereço no ViaCEP                 |
 | GET    | `/metrics`                        | Métricas no formato Prometheus              |
