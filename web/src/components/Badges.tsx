@@ -1,36 +1,58 @@
 import type { CSSProperties } from "react";
-import { CONNECTIVITY, FIELD_STATUS, SEVERITY, STATUS_LABELS, URGENCY } from "../labels";
-import type { AgentFieldStatus, AlertSeverity, Connectivity, EquipmentStatus, UrgencyLevel } from "../types";
+import { CONNECTIVITY, FIELD_STATUS, HEALTH, SEVERITY, STATUS_COLORS, STATUS_LABELS, URGENCY, type IndicatorShape } from "../labels";
+import type { AgentFieldStatus, AlertSeverity, Connectivity, EquipmentStatus, HealthLevel, UrgencyLevel } from "../types";
 
-/** Selo com ponto colorido; base dos selos de urgência, conectividade, situação em campo e gravidade. */
-function DotBadge({ label, color, title }: { label: string; color: string; title?: string }) {
+/** Forma colorida do indicador; sozinha serve a legendas e listas onde o rótulo já está ao lado. */
+export function Shape({ color, shape = "circle" }: { color: string; shape?: IndicatorShape }) {
+  return <span className={`shape shape-${shape}`} style={{ "--shape-color": color } as CSSProperties} aria-hidden />;
+}
+
+/** Indicador de status: forma + cor + rótulo, para que o estado nunca dependa só da cor. */
+function Indicator({ label, color, shape, title }: { label: string; color: string; shape?: IndicatorShape; title?: string }) {
   return (
-    <span className="urgency-badge" style={{ "--badge-color": color } as CSSProperties} title={title}>
-      <span className="dot" /> {label}
+    <span className="indicator" title={title}>
+      <Shape color={color} shape={shape} /> {label}
     </span>
   );
 }
 
 export function UrgencyBadge({ level }: { level: UrgencyLevel }) {
   const info = URGENCY[level];
-  return <DotBadge label={info.label} color={info.color} title={info.description} />;
+  return <Indicator label={info.label} color={info.color} shape={info.shape} title={info.description} />;
 }
 
 export function StatusBadge({ status }: { status: EquipmentStatus }) {
-  return <span className={`status-badge status-${status.toLowerCase()}`}>{STATUS_LABELS[status]}</span>;
+  return <Indicator label={STATUS_LABELS[status]} color={STATUS_COLORS[status]} />;
 }
 
 export function ConnectivityBadge({ connectivity }: { connectivity: Connectivity }) {
   const info = CONNECTIVITY[connectivity];
-  return <DotBadge label={info.label} color={info.color} title={info.description} />;
+  return (
+    <Indicator
+      label={info.label}
+      color={info.color}
+      shape={connectivity === "OFFLINE" ? "diamond" : "circle"}
+      title={info.description}
+    />
+  );
 }
 
 export function FieldStatusBadge({ status }: { status: AgentFieldStatus }) {
   const info = FIELD_STATUS[status];
-  return <DotBadge label={info.label} color={info.color} />;
+  return <Indicator label={info.label} color={info.color} shape={status === "SEM_SINAL" ? "diamond" : "circle"} />;
 }
 
 export function SeverityBadge({ severity }: { severity: AlertSeverity }) {
   const info = SEVERITY[severity];
-  return <DotBadge label={info.label} color={info.color} />;
+  return <Indicator label={info.label} color={info.color} shape={info.shape} />;
+}
+
+export function HealthBadge({ level, count }: { level: HealthLevel; count?: number }) {
+  const info = HEALTH[level];
+  return (
+    <span className="health-pill" title={info.description}>
+      <Shape color={info.color} shape={info.shape} /> {info.label}
+      {count !== undefined && <b>{count}</b>}
+    </span>
+  );
 }

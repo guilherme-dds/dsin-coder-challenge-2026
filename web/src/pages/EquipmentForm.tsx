@@ -6,7 +6,7 @@ import { AGENCY_LABELS, MAINTENANCE_LABELS, STATUS_LABELS, URGENCY } from "../la
 import { DynamicFields } from "../components/DynamicFields";
 import { CityMap, DEFAULT_CENTER } from "../components/CityMap";
 import { SectionHeader } from "../components/SectionHeader";
-import { CalendarClock, FileBadge, LocateFixed, MapPin, MousePointerClick, Search, SlidersHorizontal } from "lucide-react";
+import { LocateFixed, MousePointerClick, Search } from "lucide-react";
 import type { Agency, EquipmentStatus, MaintenanceType } from "../types";
 
 const empty: EquipmentPayload = {
@@ -109,7 +109,7 @@ export function EquipmentForm() {
       {error && <p className="error">{error}</p>}
 
       <section className="card">
-        <SectionHeader step={1} icon={FileBadge} title="Identificação" />
+        <SectionHeader title="Identificação" />
         <div className="grid-3">
           <label className="field">
             <span>Tipo de equipamento *</span>
@@ -161,13 +161,13 @@ export function EquipmentForm() {
 
       {selectedType && (
         <section className="card">
-          <SectionHeader step={2} icon={SlidersHorizontal} title={`Características · ${selectedType.name}`} />
+          <SectionHeader title={`Características · ${selectedType.name}`} />
           <DynamicFields fields={selectedType.attributesSchema} values={form.attributes} onChange={(v) => set("attributes", v)} />
         </section>
       )}
 
       <section className="card">
-        <SectionHeader step={3} icon={MapPin} title={selectedType?.mobile ? "Localização da base" : "Local de instalação"} />
+        <SectionHeader title={selectedType?.mobile ? "Localização da base" : "Local de instalação"} />
         <div className="grid-3">
           <label className="field">
             <span>CEP *</span>
@@ -240,7 +240,7 @@ export function EquipmentForm() {
       </section>
 
       <section className="card">
-        <SectionHeader step={4} icon={CalendarClock} title="Plano de manutenção" />
+        <SectionHeader title="Plano de manutenção" />
         <div className="grid-3">
           <label className="field">
             <span>Necessidade de manutenção</span>

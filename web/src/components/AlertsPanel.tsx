@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { BellRing, Check, MapPin, ShieldCheck, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronRight, X } from "lucide-react";
 import { ALERT_KIND_LABELS, SEVERITY, timeAgo } from "../labels";
 import { useNow } from "../hooks";
+import { Shape } from "./Badges";
 import type { Alert, AlertSeverity } from "../types";
 
 interface Props {
@@ -14,12 +15,13 @@ interface Props {
 const SEVERITIES = Object.keys(SEVERITY) as AlertSeverity[];
 
 /**
- * Fila de alertas da Central, dos mais graves para os mais leves. Alertas que surgem enquanto
- * o operador olha o mapa ganham destaque por alguns segundos.
+ * Fila de alertas da Central. Fica à vista só o que ainda pede ação (não reconhecido);
+ * os já assumidos por alguém ficam num grupo recolhido no fim.
  */
 export function AlertsPanel({ alerts, onSelect, onAcknowledge, onClose }: Props) {
   const now = useNow(5000);
   const [severity, setSeverity] = useState<AlertSeverity | null>(null);
+  const [showAcknowledged, setShowAcknowledged] = useState(false);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<string | null>(null);
   const seen = useRef<Set<string> | null>(null);
@@ -31,14 +33,16 @@ export function AlertsPanel({ alerts, onSelect, onAcknowledge, onClose }: Props)
       const arrived = alerts.filter((a) => !seen.current!.has(a.id)).map((a) => a.id);
       if (arrived.length) {
         setFresh((current) => new Set([...current, ...arrived]));
-        setTimeout(() => setFresh((current) => new Set([...current].filter((id) => !arrived.includes(id)))), 8000);
+        setTimeout(() => setFresh((current) => new Set([...current].filter((id) => !arrived.includes(id)))), 4000);
       }
     }
     seen.current = ids;
   }, [alerts]);
 
-  const counts = Object.fromEntries(SEVERITIES.map((s) => [s, alerts.filter((a) => a.severity === s).length]));
-  const visible = severity ? alerts.filter((a) => a.severity === severity) : alerts;
+  const bySeverity = severity ? alerts.filter((a) => a.severity === severity) : alerts;
+  const open = bySeverity.filter((a) => a.status === "ABERTO");
+  const acknowledged = bySeverity.filter((a) => a.status !== "ABERTO");
+  const counts = Object.fromEntries(SEVERITIES.map((s) => [s, alerts.filter((a) => a.severity === s && a.status === "ABERTO").length]));
 
   const acknowledge = async (alert: Alert) => {
     setPending(alert.id);
@@ -49,12 +53,38 @@ export function AlertsPanel({ alerts, onSelect, onAcknowledge, onClose }: Props)
     }
   };
 
+  const item = (alert: Alert) => (
+    <li
+      key={alert.id}
+      className={`alert-item ${fresh.has(alert.id) ? "fresh" : ""} ${alert.status !== "ABERTO" ? "acknowledged" : ""}`}
+    >
+      <Shape color={SEVERITY[alert.severity].color} shape={SEVERITY[alert.severity].shape} />
+      <button className="alert-body" onClick={() => onSelect(alert)} title={alert.message ?? "Ver no mapa"}>
+        <strong>{alert.title}</strong>
+        <span className="alert-kind">
+          {ALERT_KIND_LABELS[alert.kind]}
+          {alert.region && ` · ${alert.region.name}`} · {timeAgo(alert.openedAt, now)}
+        </span>
+      </button>
+      {alert.status === "ABERTO" && (
+        <button
+          className="button small ghost"
+          disabled={pending === alert.id}
+          onClick={() => acknowledge(alert)}
+          title="Assumir o alerta: ele sai da fila e se resolve sozinho quando a condição deixar de existir"
+        >
+          Reconhecer
+        </button>
+      )}
+    </li>
+  );
+
   return (
-    <aside className="ops-panel ops-alerts">
-      <div className="panel-title">
-        <BellRing size={16} /> Alertas
-        <span className="chip">{alerts.length}</span>
-        <button className="close-inline" onClick={onClose} aria-label="Fechar alertas">
+    <section className="ops-alerts" aria-label="Alertas">
+      <div className="side-head">
+        <h2>Alertas</h2>
+        <span className="muted">{open.length} pedem ação</span>
+        <button className="close-inline" onClick={onClose} aria-label="Fechar alertas" title="Fechar alertas">
           <X size={16} />
         </button>
       </div>
@@ -64,57 +94,33 @@ export function AlertsPanel({ alerts, onSelect, onAcknowledge, onClose }: Props)
           <button
             key={s}
             className={`chip-toggle ${severity === s ? "on" : ""}`}
-            style={{ "--chip-color": SEVERITY[s].color } as CSSProperties}
             onClick={() => setSeverity(severity === s ? null : s)}
+            aria-pressed={severity === s}
           >
-            <span className="dot" /> {SEVERITY[s].label} <b>{counts[s]}</b>
+            <Shape color={SEVERITY[s].color} shape={SEVERITY[s].shape} /> {SEVERITY[s].label} <b>{counts[s]}</b>
           </button>
         ))}
       </div>
 
-      {visible.length === 0 ? (
-        <div className="empty-state compact">
-          <ShieldCheck size={30} />
-          Nenhum alerta {severity ? `de gravidade ${SEVERITY[severity].label.toLowerCase()}` : "aberto"}.
-        </div>
-      ) : (
-        <ul className="alert-list">
-          {visible.map((alert) => (
-            <li
-              key={alert.id}
-              className={`alert-item ${fresh.has(alert.id) ? "fresh" : ""} ${alert.status === "RECONHECIDO" ? "acknowledged" : ""}`}
-              style={{ "--alert-color": SEVERITY[alert.severity].color } as CSSProperties}
-            >
-              <button className="alert-body" onClick={() => onSelect(alert)} title="Ver no mapa">
-                <span className="alert-kind">
-                  {ALERT_KIND_LABELS[alert.kind]} · {timeAgo(alert.openedAt, now)}
-                </span>
-                <strong>{alert.title}</strong>
-                {alert.message && <span className="muted">{alert.message}</span>}
-                {alert.region && (
-                  <span className="alert-region">
-                    <MapPin size={11} /> {alert.region.name}
-                  </span>
-                )}
-              </button>
-              {alert.status === "ABERTO" ? (
-                <button
-                  className="button small"
-                  disabled={pending === alert.id}
-                  onClick={() => acknowledge(alert)}
-                  title="Assumir o alerta: ele sai da fila de não reconhecidos e se resolve sozinho quando a condição deixar de existir"
-                >
-                  <Check size={14} /> Reconhecer
-                </button>
-              ) : (
-                <span className="muted ack-note" title={`Por ${alert.acknowledgedBy}`}>
-                  <Check size={12} /> reconhecido
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </aside>
+      <div className="alert-scroll">
+        {open.length === 0 ? (
+          <div className="empty-state compact">
+            Nenhum alerta {severity ? `de gravidade ${SEVERITY[severity].label.toLowerCase()} ` : ""}pedindo ação.
+          </div>
+        ) : (
+          <ul className="alert-list">{open.map(item)}</ul>
+        )}
+
+        {acknowledged.length > 0 && (
+          <>
+            <button className="group-toggle" onClick={() => setShowAcknowledged((v) => !v)} aria-expanded={showAcknowledged}>
+              <ChevronRight size={14} className={showAcknowledged ? "rotated" : ""} /> Reconhecidos
+              <span className="muted">{acknowledged.length}</span>
+            </button>
+            {showAcknowledged && <ul className="alert-list">{acknowledged.map(item)}</ul>}
+          </>
+        )}
+      </div>
+    </section>
   );
 }

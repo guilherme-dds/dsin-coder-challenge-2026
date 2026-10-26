@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, type CSSProperties, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import L from "leaflet";
 import { MapContainer, Marker, TileLayer, Tooltip, ZoomControl, useMap, useMapEvents } from "react-leaflet";
@@ -18,7 +18,6 @@ export interface MapMarker {
   icon: string;
   /** Cor do estado (hex: o Leaflet não resolve variáveis CSS). */
   color: string;
-  pulse?: boolean;
   /** Sem comunicação (equipamento) ou sem sinal (agente): ganha uma marca no canto do pino. */
   silent?: boolean;
   /** Fora de atividade (ex.: agente em pausa): pino esmaecido. */
@@ -47,18 +46,16 @@ interface Props {
 const iconCache = new Map<string, L.DivIcon>();
 
 function pinIcon(marker: MapMarker, selected: boolean) {
-  const key = `${marker.kind}|${marker.icon}|${marker.color}|${marker.pulse}|${marker.silent}|${marker.dimmed}|${selected}`;
+  const key = `${marker.kind}|${marker.icon}|${marker.color}|${marker.silent}|${marker.dimmed}|${selected}`;
   let icon = iconCache.get(key);
   if (!icon) {
-    const classes = ["map-pin", `map-pin-${marker.kind}`, marker.pulse && "pulse", marker.dimmed && "dimmed", selected && "selected"]
-      .filter(Boolean)
-      .join(" ");
+    const classes = ["map-pin", `map-pin-${marker.kind}`, marker.dimmed && "dimmed", selected && "selected"].filter(Boolean).join(" ");
     const flag = marker.silent ? `<span class="pin-flag" title="Sem comunicação"></span>` : "";
     icon = L.divIcon({
       className: "",
-      iconSize: [34, 34],
-      iconAnchor: [17, 17],
-      html: `<div class="${classes}" style="--pin-color:${marker.color}">${renderToStaticMarkup(<TypeIcon code={marker.icon} size={16} />)}${flag}</div>`,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13],
+      html: `<div class="${classes}" style="--pin-color:${marker.color}">${renderToStaticMarkup(<TypeIcon code={marker.icon} size={14} />)}${flag}</div>`,
     });
     iconCache.set(key, icon);
   }
@@ -67,6 +64,17 @@ function pinIcon(marker: MapMarker, selected: boolean) {
 
 function ClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
   useMapEvents({ click: (e) => onMapClick(e.latlng.lat, e.latlng.lng) });
+  return null;
+}
+
+/** O mapa fica entre painéis que abrem e fecham: o Leaflet precisa saber quando o espaço muda. */
+function FitContainer() {
+  const map = useMap();
+  useEffect(() => {
+    const observer = new ResizeObserver(() => map.invalidateSize());
+    observer.observe(map.getContainer());
+    return () => observer.disconnect();
+  }, [map]);
   return null;
 }
 
@@ -103,6 +111,7 @@ export function CityMap({
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ZoomControl position="bottomright" />
+        <FitContainer />
         {heat && heat.length > 0 && <HeatLayer points={heat} />}
         {onMapClick && <ClickHandler onMapClick={onMapClick} />}
         {focus && <FlyTo focus={focus} />}
@@ -117,7 +126,11 @@ export function CityMap({
             <Tooltip direction="top" offset={[0, -18]}>
               <strong>{m.title}</strong>
               {m.subtitle && <div>{m.subtitle}</div>}
-              {m.caption && <div style={{ color: m.color, marginTop: 4 }}>● {m.caption}</div>}
+              {m.caption && (
+                <div className="indicator" style={{ marginTop: 4 }}>
+                  <span className="shape shape-circle" style={{ "--shape-color": m.color } as CSSProperties} /> {m.caption}
+                </div>
+              )}
             </Tooltip>
           </Marker>
         ))}

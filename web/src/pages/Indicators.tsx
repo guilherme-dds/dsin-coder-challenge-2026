@@ -1,17 +1,6 @@
 import { useState, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  AlertTriangle,
-  BarChart3,
-  ChevronRight,
-  Gauge as GaugeIcon,
-  LineChart,
-  Map as MapIcon,
-  MapPin,
-  ShieldCheck,
-  Users,
-  WifiOff,
-} from "lucide-react";
+import { Map as MapIcon } from "lucide-react";
 import { api } from "../api";
 import { useAsync, useNow } from "../hooks";
 import {
@@ -22,17 +11,19 @@ import {
   STATUS_COLORS,
   STATUS_LABELS,
   URGENCY,
+  availabilityColor,
   maintenanceDue,
   timeAgo,
 } from "../labels";
-import { UrgencyBadge } from "../components/Badges";
+import { HealthBadge, Shape, UrgencyBadge } from "../components/Badges";
 import { TypeIcon } from "../components/TypeIcon";
-import { Gauge, availabilityColor } from "../components/Gauge";
 import { AvailabilityChart } from "../components/AvailabilityChart";
+import { SummaryStrip } from "../components/SummaryStrip";
 import type {
   AgentFieldStatus,
   AlertSeverity,
   Connectivity,
+  Dashboard,
   EquipmentStatus,
   HealthLevel,
   RegionOverview,
@@ -40,8 +31,19 @@ import type {
 } from "../types";
 
 const REFRESH_MS = 30_000;
+/** A fila mostra só os primeiros; o resto fica em "Ver todos". */
+const QUEUE_LIMIT = 6;
 const HEALTH_LEVELS = Object.keys(HEALTH) as HealthLevel[];
 const SEVERITIES = Object.keys(SEVERITY) as AlertSeverity[];
+
+type CompositionTab = "status" | "connectivity" | "type" | "field";
+
+const TABS: { key: CompositionTab; label: string }[] = [
+  { key: "status", label: "Situação" },
+  { key: "connectivity", label: "Comunicação" },
+  { key: "type", label: "Tipo" },
+  { key: "field", label: "Equipes" },
+];
 
 export function Indicators() {
   const now = useNow(5000);
@@ -53,324 +55,286 @@ export function Indicators() {
   });
   const navigate = useNavigate();
 
-  if (loading && !data) {
-    return (
-      <div className="loading">
-        <span className="pulse-dot" /> Consolidando indicadores…
-      </div>
-    );
-  }
+  if (loading && !data) return <div className="loading">Consolidando indicadores…</div>;
   if (error || !data) return <p className="error">{error}</p>;
 
   const { totals } = data;
-  const color = availabilityColor(totals.availability);
   const openAlerts = SEVERITIES.reduce((sum, s) => sum + data.openAlerts[s], 0);
-  const maxTypeCount = Math.max(...data.byType.map((t) => t.count), 1);
-  const statuses = Object.entries(data.byStatus) as [EquipmentStatus, number][];
-  const connectivity = (Object.entries(data.connectivity) as [Connectivity, number][]).filter(([, n]) => n > 0);
-  const fieldStatuses = Object.entries(data.agentsByFieldStatus) as [AgentFieldStatus, number][];
   const measurable = (regions.data ?? []).filter((r) => r.id !== null);
+  const queue = data.critical.slice(0, QUEUE_LIMIT);
 
   return (
     <>
       <header className="page-header">
         <div>
-          <div className="eyebrow">
-            Visão consolidada · atualizado {timeAgo(updatedAt?.toISOString() ?? null, now)}
-          </div>
-          <h1>Indicadores da cidade</h1>
-          <p className="muted">Disponibilidade da rede, regiões que exigem atenção e equipes em campo.</p>
+          <h1>Indicadores</h1>
+          <p>Como a cidade está operando agora · atualizado {timeAgo(updatedAt?.toISOString() ?? null, now)}</p>
         </div>
         <Link to="/" className="button">
-          <MapIcon size={17} /> Abrir mapa operacional
+          <MapIcon size={15} /> Abrir mapa
         </Link>
       </header>
 
-      <section className="card availability-hero">
-        <div>
-          <div className="card-title">
-            <GaugeIcon size={20} />
-            <h2>Disponibilidade da rede</h2>
-            <span className="health-pill" style={{ "--health-color": HEALTH[data.health].color } as CSSProperties}>
-              Cidade: {HEALTH[data.health].label}
+      <div className="dash-grid">
+        <section className="card overview area-overview">
+          <div className="overview-main">
+            <div className="card-title">
+              <h2>Disponibilidade da rede</h2>
+              <HealthBadge level={data.health} />
+            </div>
+            <span className="big">{totals.availability}%</span>
+            <span className="muted">
+              {totals.operational} de {totals.installed} equipamentos instalados operando
             </span>
+            <AvailabilityBar value={totals.availability} />
           </div>
-          <p className="muted">
-            Equipamentos instalados que estão operando e comunicando. Quem parou de enviar telemetria conta como
-            indisponível.
-          </p>
           <div className="vitals-stats">
             <div className="vital">
-              <small>Equipamentos</small>
-              <strong>{totals.equipments}</strong>
+              <small>{totals.unavailable > 0 && <Shape color="var(--critical)" shape="diamond" />} Indisponíveis</small>
+              <strong>{totals.unavailable}</strong>
+              <span className="vital-sub">fora de operação ou sem comunicação</span>
             </div>
             <div className="vital">
-              <small>Instalados</small>
-              <strong>{totals.installed}</strong>
-            </div>
-            <div className="vital">
-              <small>Operacionais</small>
-              <strong style={{ color: "var(--state-green)" }}>{totals.operational}</strong>
-            </div>
-            <div className="vital">
-              <small>Indisponíveis</small>
-              <strong style={{ color: totals.unavailable ? "var(--state-red)" : undefined }}>{totals.unavailable}</strong>
+              <small>{data.openAlerts.CRITICA > 0 && <Shape color="var(--critical)" shape="diamond" />} Alertas abertos</small>
+              <strong>{openAlerts}</strong>
+              <span className="vital-sub">
+                {data.openAlerts.CRITICA} crítico{data.openAlerts.CRITICA === 1 ? "" : "s"} · {data.openAlerts.ALTA} alto
+                {data.openAlerts.ALTA === 1 ? "" : "s"}
+              </span>
             </div>
             <div className="vital">
               <small>Agentes em atividade</small>
-              <strong>
-                {totals.activeAgents}
-                <span className="vital-of">/{totals.agentsOnDuty}</span>
-              </strong>
-            </div>
-            <div className="vital">
-              <small>Alertas abertos</small>
-              <strong style={{ color: data.openAlerts.CRITICA ? "var(--state-red)" : undefined }}>{openAlerts}</strong>
+              <strong>{totals.activeAgents}</strong>
+              <span className="vital-sub">de {totals.agentsOnDuty} em serviço</span>
             </div>
           </div>
-        </div>
-        <Gauge value={totals.availability} color={color} label="de disponibilidade operacional" />
-      </section>
+        </section>
 
-      <section className="card">
-        <div className="card-header">
-          <div className="card-title">
-            <MapPin size={19} />
-            <h2>Regiões da cidade</h2>
-          </div>
-          <div className="row">
-            {HEALTH_LEVELS.map((level) => (
-              <span
-                key={level}
-                className="health-pill"
-                style={{ "--health-color": HEALTH[level].color } as CSSProperties}
-                title={HEALTH[level].description}
-              >
-                {HEALTH[level].label} <b>{data.regionsByHealth[level]}</b>
-              </span>
-            ))}
-          </div>
+        <div className="area-urgency">
+          <SummaryStrip
+            label="Equipamentos por urgência"
+            onSelect={(level) => level && navigate(`/equipamentos?urgency=${level}`)}
+            items={(Object.keys(URGENCY) as UrgencyLevel[]).map((level) => ({
+              key: level,
+              label: URGENCY[level].label,
+              count: data.byUrgency[level],
+              color: URGENCY[level].color,
+              shape: URGENCY[level].shape,
+            }))}
+          />
         </div>
-        {regions.error && <p className="error">{regions.error}</p>}
-        <div className="region-grid">
-          {regions.data?.map((region) => (
-            <RegionCard key={region.code} region={region} onOpen={() => navigate(`/?regiao=${region.code}`)} />
-          ))}
-        </div>
-      </section>
 
-      <section className="card">
-        <div className="card-header">
-          <div className="card-title">
-            <LineChart size={19} />
-            <h2>Disponibilidade nas últimas 24 h</h2>
-          </div>
-          <select className="compact-select" value={historyRegion} onChange={(e) => setHistoryRegion(e.target.value)}>
-            <option value="">Cidade inteira</option>
-            {measurable.map((r) => (
-              <option key={r.code} value={r.id!}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        {history.data && <AvailabilityChart points={history.data} />}
-      </section>
-
-      <section className="urgency-grid">
-        {(Object.keys(URGENCY) as UrgencyLevel[]).map((level) => (
-          <button
-            key={level}
-            className="monitor-tile"
-            style={{ "--tile-color": URGENCY[level].color } as CSSProperties}
-            onClick={() => navigate(`/equipamentos?urgency=${level}`)}
-          >
-            <span className="tile-top">
-              <span className="tile-code">{URGENCY[level].label.toUpperCase()}</span>
-              <ChevronRight size={14} color="var(--muted)" />
-            </span>
-            <strong>{data.byUrgency[level]}</strong>
-            <span className="tile-desc">{URGENCY[level].description}</span>
-            <span className="meter">
-              <span style={{ width: `${totals.equipments ? (data.byUrgency[level] / totals.equipments) * 100 : 0}%` }} />
-            </span>
-          </button>
-        ))}
-      </section>
-
-      <div className="two-columns">
-        <section className="card">
+        <section className="card area-regions">
           <div className="card-header">
-            <div className="card-title">
-              <AlertTriangle size={19} />
-              <h2>Fila de atendimento</h2>
+            <h2>Regiões</h2>
+            <div className="row">
+              {HEALTH_LEVELS.map((level) => (
+                <HealthBadge key={level} level={level} count={data.regionsByHealth[level]} />
+              ))}
             </div>
-            <Link to="/equipamentos?urgency=CRITICO" className="muted">
-              ver todos
-            </Link>
+          </div>
+          {regions.error && <p className="error">{regions.error}</p>}
+          <div className="region-grid">
+            {regions.data?.map((region) => (
+              <RegionCard key={region.code} region={region} onOpen={() => navigate(`/?regiao=${region.code}`)} />
+            ))}
+          </div>
+        </section>
+
+        <section className="card area-history">
+          <div className="card-header">
+            <h2>Últimas 24 h</h2>
+            <select
+              className="compact-select"
+              value={historyRegion}
+              onChange={(e) => setHistoryRegion(e.target.value)}
+              aria-label="Região do gráfico"
+            >
+              <option value="">Cidade inteira</option>
+              {measurable.map((r) => (
+                <option key={r.code} value={r.id!}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          {history.data && <AvailabilityChart points={history.data} />}
+        </section>
+
+        <section className="card area-queue">
+          <div className="card-header">
+            <h2>Fila de atendimento</h2>
+            <Link to="/equipamentos?urgency=CRITICO">Ver todos</Link>
           </div>
 
-          {data.critical.length === 0 ? (
-            <div className="empty-state">
-              <ShieldCheck size={36} />
-              Nenhum equipamento crítico. Rede operando normalmente.
-            </div>
+          {queue.length === 0 ? (
+            <div className="empty-state">Nenhum equipamento crítico. Rede operando normalmente.</div>
           ) : (
             <div className="queue">
-              {data.critical.map((e) => (
-                <div
-                  key={e.id}
-                  className="queue-item"
-                  style={{ "--item-color": URGENCY[e.urgency].color } as CSSProperties}
-                  onClick={() => navigate(`/equipamentos/${e.id}`)}
-                >
+              {queue.map((e) => (
+                <div key={e.id} className="queue-item" onClick={() => navigate(`/equipamentos/${e.id}`)}>
                   <span className="icon-tile">
-                    <TypeIcon code={e.type.code} />
+                    <TypeIcon code={e.type.code} size={16} />
                   </span>
                   <div>
-                    <div className="queue-title">
-                      {e.type.name} <span className="mono muted">#{e.serialNumber}</span>
-                    </div>
+                    <div className="queue-title">{e.type.name}</div>
                     <div className="queue-meta">
-                      <MapPin size={13} /> {e.street}, {e.reference} · {e.district}
+                      {e.district} · {queueReason(e, now)}
                     </div>
                   </div>
-                  <div className="queue-side">
-                    <UrgencyBadge level={e.urgency} />
-                    <span className="muted mono">{queueReason(e, now)}</span>
-                  </div>
+                  <UrgencyBadge level={e.urgency} />
                 </div>
               ))}
             </div>
           )}
         </section>
 
-        <div>
-          <section className="card">
-            <div className="card-header">
-              <div className="card-title">
-                <Users size={19} />
-                <h2>Equipes em campo</h2>
-              </div>
-              <span className="chip">{totals.agentsOnDuty} em serviço</span>
-            </div>
-            <ul className="plain legend-list">
-              {fieldStatuses.map(([status, count]) => (
-                <li key={status}>
-                  <span className="swatch" style={{ background: FIELD_STATUS[status].color }} />
-                  {FIELD_STATUS[status].label}
-                  <b>{count}</b>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="card">
-            <div className="card-header">
-              <div className="card-title">
-                <BarChart3 size={19} />
-                <h2>Composição da rede</h2>
-              </div>
-            </div>
-
-            <p className="section-label">Situação</p>
-            <StackedBar items={statuses.map(([s, n]) => ({ key: s, label: STATUS_LABELS[s], color: STATUS_COLORS[s], count: n }))} />
-
-            <p className="section-label">
-              <WifiOff size={12} /> Comunicação
-            </p>
-            <StackedBar
-              items={connectivity.map(([c, n]) => ({ key: c, label: CONNECTIVITY[c].label, color: CONNECTIVITY[c].color, count: n }))}
-            />
-
-            <p className="section-label">Por tipo</p>
-            <div className="bars">
-              {data.byType.map((t) => (
-                <div key={t.code} className="bar-row">
-                  <TypeIcon code={t.code} />
-                  <div>
-                    {t.name}
-                    <div className="meter">
-                      <span style={{ width: `${(t.count / maxTypeCount) * 100}%` }} />
-                    </div>
-                  </div>
-                  <span className="count">{t.count}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
+        <Composition data={data} />
       </div>
     </>
   );
 }
 
 /** Por que o equipamento está na fila: falha, silêncio ou manutenção. */
-function queueReason(e: { maintenanceType: string; connectivity: Connectivity; lastSeenAt: string | null; nextMaintenanceAt: string | null }, now: number) {
+function queueReason(
+  e: { maintenanceType: string; connectivity: Connectivity; lastSeenAt: string | null; nextMaintenanceAt: string | null },
+  now: number,
+) {
   if (e.maintenanceType === "IMEDIATA") return "manutenção imediata";
   if (e.connectivity === "OFFLINE") return `sem comunicação ${timeAgo(e.lastSeenAt, now)}`;
-  return maintenanceDue(e.nextMaintenanceAt);
+  return `manutenção ${maintenanceDue(e.nextMaintenanceAt)}`;
 }
 
+/** Barra de disponibilidade com as marcas dos limites de atenção (80%) e crítico (60%). */
+function AvailabilityBar({ value }: { value: number }) {
+  return (
+    <>
+      <div className="availability-bar" style={{ "--bar-color": availabilityColor(value) } as CSSProperties}>
+        <span style={{ width: `${value}%` }} />
+        <i style={{ left: "60%" }} title="Limite crítico: 60%" />
+        <i style={{ left: "80%" }} title="Limite de atenção: 80%" />
+      </div>
+      <div className="availability-scale">
+        <span style={{ left: "60%" }}>60</span>
+        <span style={{ left: "80%" }}>80</span>
+      </div>
+    </>
+  );
+}
+
+/** Cartão de região: saúde, disponibilidade e, numa linha só, o que está puxando para baixo. */
 function RegionCard({ region, onOpen }: { region: RegionOverview; onOpen: () => void }) {
-  const health = HEALTH[region.health];
+  const issues = [
+    ...SEVERITIES.filter((s) => (s === "CRITICA" || s === "ALTA") && region.openAlerts[s] > 0).map(
+      (s) => `${region.openAlerts[s]} ${SEVERITY[s].label.toLowerCase()}`,
+    ),
+    region.offline > 0 ? `${region.offline} sem comunicação` : null,
+  ].filter(Boolean);
+
   return (
     <button
       className="region-card"
-      style={{ "--health-color": health.color, "--tile-color": availabilityColor(region.availability) } as CSSProperties}
+      style={{ "--health-color": HEALTH[region.health].color, "--tile-color": availabilityColor(region.availability) } as CSSProperties}
       onClick={onOpen}
       title="Ver a região no mapa"
     >
       <span className="region-top">
         <strong>{region.name}</strong>
-        <span className="health-pill">{health.label}</span>
+        <HealthBadge level={region.health} />
       </span>
       <span className="region-availability">
         <b>{region.availability}%</b>
         <span className="muted">
-          {region.operational} de {region.installed} operando
+          {region.operational}/{region.installed}
         </span>
       </span>
       <span className="meter">
         <span style={{ width: `${region.availability}%` }} />
       </span>
-      <span className="region-facts">
-        <span>
-          <WifiOff size={12} /> {region.offline} sem comunicação
-        </span>
-        <span>
-          <Users size={12} /> {region.activeAgents} em atividade
-        </span>
-      </span>
-      <span className="region-alerts">
-        {SEVERITIES.filter((s) => region.openAlerts[s] > 0).map((s) => (
-          <span key={s} className="alert-count" style={{ "--alert-color": SEVERITY[s].color } as CSSProperties}>
-            <i /> {region.openAlerts[s]} {SEVERITY[s].label.toLowerCase()}
-          </span>
-        ))}
-        {SEVERITIES.every((s) => region.openAlerts[s] === 0) && <span className="muted">Sem alertas abertos</span>}
-      </span>
+      <span className="region-issues">{issues.length ? issues.join(" · ") : "Sem pendências graves"}</span>
     </button>
   );
 }
 
-function StackedBar({ items }: { items: { key: string; label: string; color: string; count: number }[] }) {
+/** Composição da rede em abas: uma distribuição por vez, em vez de quatro blocos empilhados. */
+function Composition({ data }: { data: Dashboard }) {
+  const [tab, setTab] = useState<CompositionTab>("status");
+
+  const items =
+    tab === "status"
+      ? (Object.entries(data.byStatus) as [EquipmentStatus, number][]).map(([s, n]) => ({
+          key: s,
+          label: STATUS_LABELS[s],
+          color: STATUS_COLORS[s],
+          count: n,
+        }))
+      : tab === "connectivity"
+        ? (Object.entries(data.connectivity) as [Connectivity, number][])
+            .filter(([, n]) => n > 0)
+            .map(([c, n]) => ({ key: c, label: CONNECTIVITY[c].label, color: CONNECTIVITY[c].color, count: n }))
+        : tab === "field"
+          ? (Object.entries(data.agentsByFieldStatus) as [AgentFieldStatus, number][]).map(([f, n]) => ({
+              key: f,
+              label: FIELD_STATUS[f].label,
+              color: FIELD_STATUS[f].color,
+              count: n,
+            }))
+          : null;
+
+  const maxTypeCount = Math.max(...data.byType.map((t) => t.count), 1);
+
   return (
-    <>
-      <div className="stacked">
-        {items.map((item) => (
-          <span key={item.key} title={`${item.label}: ${item.count}`} style={{ flex: item.count, background: item.color }} />
+    <section className="card area-composition">
+      <div className="card-header">
+        <h2>Composição</h2>
+      </div>
+      <div className="tabs" role="tablist">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            className={tab === t.key ? "on" : ""}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </button>
         ))}
       </div>
-      <ul className="plain legend-list">
-        {items.map((item) => (
-          <li key={item.key}>
-            <span className="swatch" style={{ background: item.color }} />
-            {item.label}
-            <b>{item.count}</b>
-          </li>
-        ))}
-      </ul>
-    </>
+
+      {items ? (
+        <>
+          <div className="stacked">
+            {items.map((item) => (
+              <span key={item.key} title={`${item.label}: ${item.count}`} style={{ flex: item.count, background: item.color }} />
+            ))}
+          </div>
+          <ul className="plain legend-list single">
+            {items.map((item) => (
+              <li key={item.key}>
+                <span className="swatch" style={{ background: item.color }} />
+                {item.label}
+                <b>{item.count}</b>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <div className="bars">
+          {data.byType.map((t) => (
+            <div key={t.code} className="bar-row">
+              <TypeIcon code={t.code} size={15} />
+              <div>
+                {t.name}
+                <div className="meter">
+                  <span style={{ width: `${(t.count / maxTypeCount) * 100}%` }} />
+                </div>
+              </div>
+              <span className="count">{t.count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

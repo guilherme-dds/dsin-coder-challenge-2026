@@ -1,13 +1,11 @@
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
-export function SectionHeader({ step, icon: Icon, title }: { step: number; icon: LucideIcon; title: string }) {
+/** Cabeçalho de seção de formulário ou ficha: título e, opcionalmente, ações à direita. */
+export function SectionHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="card-header">
-      <div className="card-title">
-        <Icon size={19} />
-        <h2>{title}</h2>
-      </div>
-      <span className="step">{String(step).padStart(2, "0")}</span>
+      <h2>{title}</h2>
+      {children}
     </div>
   );
 }

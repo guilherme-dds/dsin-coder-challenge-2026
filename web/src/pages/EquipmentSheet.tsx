@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CalendarClock, ClipboardPen, History, MapPin, Pencil, Stethoscope, UserRound, Wrench } from "lucide-react";
+import { CalendarClock, MapPin, Pencil, UserRound } from "lucide-react";
 import { api } from "../api";
 import { useAsync } from "../hooks";
 import {
@@ -35,7 +35,7 @@ export function EquipmentSheet() {
   if (!eq) {
     return (
       <div className="loading">
-        <span className="pulse-dot" /> Carregando ficha…
+        Carregando ficha…
       </div>
     );
   }
@@ -56,18 +56,17 @@ export function EquipmentSheet() {
   return (
     <>
       <header className="page-header">
-        <div className="patient">
+        <div className="sheet-head">
           <span className="icon-tile lg">
-            <TypeIcon code={eq.type.code} size={30} />
+            <TypeIcon code={eq.type.code} size={22} />
           </span>
           <div>
             <div className="eyebrow">Ficha do equipamento · {eq.type.name}</div>
             <h1>
               {eq.brand} {eq.model}
             </h1>
-            <div className="row" style={{ marginTop: 10 }}>
+            <div className="row" style={{ marginTop: 8 }}>
               <span className="chip">#{eq.serialNumber}</span>
-              <UrgencyBadge level={eq.urgency} />
               <StatusBadge status={eq.status} />
               <ConnectivityBadge connectivity={eq.connectivity} />
               <span className="chip">{AGENCY_LABELS[eq.agency]}</span>
@@ -81,20 +80,19 @@ export function EquipmentSheet() {
       </header>
 
       <section className="vitals-row">
-        <div className="vital-box" style={{ borderColor: URGENCY[eq.urgency].color }}>
+        <div className="vital-box">
           <small>Urgência</small>
-          <strong style={{ color: URGENCY[eq.urgency].color }}>{URGENCY[eq.urgency].label}</strong>
+          <strong>
+            <UrgencyBadge level={eq.urgency} />
+          </strong>
+          <span className="muted">{URGENCY[eq.urgency].description}</span>
         </div>
         <div className="vital-box">
-          <small>
-            <Wrench size={12} /> Manutenção
-          </small>
+          <small>Manutenção</small>
           <strong>{MAINTENANCE_LABELS[eq.maintenanceType]}</strong>
         </div>
         <div className="vital-box">
-          <small>
-            <CalendarClock size={12} /> Próxima manutenção
-          </small>
+          <small>Próxima manutenção</small>
           <strong>{formatDate(eq.nextMaintenanceAt)}</strong>
           <span className="muted">{maintenanceDue(eq.nextMaintenanceAt)}</span>
         </div>
@@ -108,10 +106,7 @@ export function EquipmentSheet() {
         <div>
           <section className="card">
             <div className="card-header">
-              <div className="card-title">
-                <Stethoscope size={19} />
-                <h2>Características</h2>
-              </div>
+              <h2>Características</h2>
             </div>
             <dl className="details">
               {eq.type.attributesSchema.map((field) => (
@@ -125,10 +120,7 @@ export function EquipmentSheet() {
 
           <section className="card">
             <div className="card-header">
-              <div className="card-title">
-                <MapPin size={19} />
-                <h2>{eq.type.mobile ? "Base" : "Instalação"}</h2>
-              </div>
+              <h2>{eq.type.mobile ? "Base" : "Instalação"}</h2>
               <span className="chip">
                 {eq.latitude.toFixed(5)}, {eq.longitude.toFixed(5)}
               </span>
@@ -156,7 +148,6 @@ export function EquipmentSheet() {
                   longitude: eq.longitude,
                   icon: eq.type.code,
                   color: URGENCY[eq.urgency].hex,
-                  pulse: eq.urgency === "CRITICO",
                   title: eq.serialNumber,
                 },
               ]}
@@ -176,10 +167,7 @@ export function EquipmentSheet() {
         <div>
           <section className="card">
             <div className="card-header">
-              <div className="card-title">
-                <ClipboardPen size={19} />
-                <h2>Ações operacionais</h2>
-              </div>
+              <h2>Ações operacionais</h2>
             </div>
             {actionError && <p className="error">{actionError}</p>}
 
@@ -242,10 +230,7 @@ export function EquipmentSheet() {
 
           <section className="card">
             <div className="card-header">
-              <div className="card-title">
-                <History size={19} />
-                <h2>Histórico</h2>
-              </div>
+              <h2>Histórico</h2>
               <span className="chip">{eq.events.length} registros</span>
             </div>
             <ol className="timeline">

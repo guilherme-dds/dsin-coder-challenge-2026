@@ -23,25 +23,29 @@ export const STATUS_LABELS: Record<EquipmentStatus, string> = {
   BAIXADO: "Baixado (descartado)",
 };
 
+/**
+ * Cores seguem a lógica de sala de controle (ISA-101): o que está normal fica neutro, e cor saturada
+ * só aparece para o que é anormal. Assim o olho vai direto para o problema.
+ */
 export const STATUS_COLORS: Record<EquipmentStatus, string> = {
-  OPERACIONAL: "var(--state-green)",
-  MAU_FUNCIONAMENTO: "var(--state-red)",
-  EM_MANUTENCAO: "var(--state-yellow)",
-  NAO_INSTALADO: "var(--state-blue)",
-  DESATIVADO: "#8b93a7",
-  FURTADO: "#b46bff",
-  BAIXADO: "#3f4452",
+  OPERACIONAL: "var(--normal)",
+  MAU_FUNCIONAMENTO: "var(--critical)",
+  EM_MANUTENCAO: "var(--medium)",
+  NAO_INSTALADO: "var(--low)",
+  DESATIVADO: "var(--inactive)",
+  FURTADO: "var(--magenta)",
+  BAIXADO: "var(--inactive-dark)",
 };
 
 /** Mesmas cores de STATUS_COLORS em hex, para os pinos do Leaflet. */
 export const STATUS_HEX: Record<EquipmentStatus, string> = {
-  OPERACIONAL: "#2ee59d",
-  MAU_FUNCIONAMENTO: "#ff4d5e",
-  EM_MANUTENCAO: "#ffd23f",
-  NAO_INSTALADO: "#4d9fff",
-  DESATIVADO: "#8b93a7",
-  FURTADO: "#b46bff",
-  BAIXADO: "#3f4452",
+  OPERACIONAL: "#8d939e",
+  MAU_FUNCIONAMENTO: "#e5484d",
+  EM_MANUTENCAO: "#d9b31c",
+  NAO_INSTALADO: "#3aa8c1",
+  DESATIVADO: "#5c616b",
+  FURTADO: "#cf5b9e",
+  BAIXADO: "#3d4149",
 };
 
 export const AGENCY_LABELS: Record<Agency, string> = {
@@ -52,25 +56,31 @@ export const AGENCY_LABELS: Record<Agency, string> = {
 };
 
 export const CONNECTIVITY: Record<Connectivity, { label: string; description: string; color: string }> = {
-  ONLINE: { label: "Online", description: "Comunicando normalmente", color: "var(--state-green)" },
-  INSTAVEL: { label: "Instável", description: "Sem contato há mais de 2 min", color: "var(--state-yellow)" },
-  OFFLINE: { label: "Sem comunicação", description: "Sem contato há mais de 10 min", color: "var(--state-red)" },
-  SEM_TELEMETRIA: { label: "Sem telemetria", description: "Fora de operação: não envia dados", color: "var(--state-gray)" },
+  ONLINE: { label: "Online", description: "Comunicando normalmente", color: "var(--normal)" },
+  INSTAVEL: { label: "Instável", description: "Sem contato há mais de 2 min", color: "var(--medium)" },
+  OFFLINE: { label: "Sem comunicação", description: "Sem contato há mais de 10 min", color: "var(--critical)" },
+  SEM_TELEMETRIA: { label: "Sem telemetria", description: "Fora de operação: não envia dados", color: "var(--inactive)" },
 };
 
 export const FIELD_STATUS: Record<AgentFieldStatus, { label: string; color: string }> = {
-  DISPONIVEL: { label: "Disponível", color: "var(--state-green)" },
-  EM_ATENDIMENTO: { label: "Em atendimento", color: "var(--state-orange)" },
-  EM_DESLOCAMENTO: { label: "Em deslocamento", color: "var(--state-blue)" },
-  EM_PAUSA: { label: "Em pausa", color: "var(--state-gray)" },
-  SEM_SINAL: { label: "Sem sinal", color: "var(--state-red)" },
+  DISPONIVEL: { label: "Disponível", color: "var(--normal)" },
+  EM_ATENDIMENTO: { label: "Em atendimento", color: "var(--violet)" },
+  EM_DESLOCAMENTO: { label: "Em deslocamento", color: "var(--accent)" },
+  EM_PAUSA: { label: "Em pausa", color: "var(--inactive)" },
+  SEM_SINAL: { label: "Sem sinal", color: "var(--critical)" },
 };
 
-export const SEVERITY: Record<AlertSeverity, { label: string; color: string }> = {
-  CRITICA: { label: "Crítica", color: "var(--state-red)" },
-  ALTA: { label: "Alta", color: "var(--state-orange)" },
-  MEDIA: { label: "Média", color: "var(--state-yellow)" },
-  BAIXA: { label: "Baixa", color: "var(--state-blue)" },
+/**
+ * Forma do indicador (padrão de status do IBM Carbon): gravidade nunca depende só da cor,
+ * para quem não distingue cores e para impressão.
+ */
+export type IndicatorShape = "diamond" | "triangle" | "square" | "circle" | "ring";
+
+export const SEVERITY: Record<AlertSeverity, { label: string; color: string; shape: IndicatorShape }> = {
+  CRITICA: { label: "Crítica", color: "var(--critical)", shape: "diamond" },
+  ALTA: { label: "Alta", color: "var(--high)", shape: "triangle" },
+  MEDIA: { label: "Média", color: "var(--medium)", shape: "square" },
+  BAIXA: { label: "Baixa", color: "var(--low)", shape: "circle" },
 };
 
 export const ALERT_KIND_LABELS: Record<AlertKind, string> = {
@@ -84,10 +94,10 @@ export const ALERT_KIND_LABELS: Record<AlertKind, string> = {
   AGENTE_SEM_SINAL: "Agente sem sinal",
 };
 
-export const HEALTH: Record<HealthLevel, { label: string; description: string; color: string }> = {
-  CRITICO: { label: "Crítica", description: "Alerta crítico ou disponibilidade abaixo de 60%", color: "var(--state-red)" },
-  ATENCAO: { label: "Atenção", description: "Alerta grave ou disponibilidade abaixo de 80%", color: "var(--state-orange)" },
-  NORMAL: { label: "Normal", description: "Operando normalmente", color: "var(--state-green)" },
+export const HEALTH: Record<HealthLevel, { label: string; description: string; color: string; shape: IndicatorShape }> = {
+  CRITICO: { label: "Crítica", description: "Alerta crítico ou disponibilidade abaixo de 60%", color: "var(--critical)", shape: "diamond" },
+  ATENCAO: { label: "Atenção", description: "Alerta grave ou disponibilidade abaixo de 80%", color: "var(--high)", shape: "triangle" },
+  NORMAL: { label: "Normal", description: "Operando normalmente", color: "var(--normal)", shape: "circle" },
 };
 
 /** Nome amigável das medições de telemetria; medições desconhecidas aparecem pela chave. */
@@ -115,13 +125,16 @@ export const MAINTENANCE_LABELS: Record<MaintenanceType, string> = {
 };
 
 /** `hex` é usado onde variáveis CSS não chegam (ícones e camadas do Leaflet). */
-export const URGENCY: Record<UrgencyLevel, { label: string; description: string; color: string; hex: string }> = {
-  CRITICO: { label: "Crítico", description: "Falha ativa ou manutenção imediata", color: "var(--state-red)", hex: "#ff4d5e" },
-  ALERTA: { label: "Alerta", description: "Sem comunicação ou manutenção vencida", color: "var(--state-orange)", hex: "#ff9f1c" },
-  ATENCAO: { label: "Atenção", description: "Em manutenção ou manutenção nos próximos 7 dias", color: "var(--state-yellow)", hex: "#ffd23f" },
-  NORMAL: { label: "Normal", description: "Operando normalmente", color: "var(--state-green)", hex: "#2ee59d" },
-  PENDENTE: { label: "Pendente", description: "Aguardando instalação", color: "var(--state-blue)", hex: "#4d9fff" },
-  INATIVO: { label: "Inativo", description: "Furtado, desativado ou baixado", color: "var(--state-gray)", hex: "#6b7280" },
+export const URGENCY: Record<
+  UrgencyLevel,
+  { label: string; description: string; color: string; hex: string; shape: IndicatorShape }
+> = {
+  CRITICO: { label: "Crítico", description: "Falha ativa ou manutenção imediata", color: "var(--critical)", hex: "#e5484d", shape: "diamond" },
+  ALERTA: { label: "Alerta", description: "Sem comunicação ou manutenção vencida", color: "var(--high)", hex: "#ef7d1a", shape: "triangle" },
+  ATENCAO: { label: "Atenção", description: "Em manutenção ou manutenção nos próximos 7 dias", color: "var(--medium)", hex: "#d9b31c", shape: "square" },
+  NORMAL: { label: "Normal", description: "Operando normalmente", color: "var(--normal)", hex: "#8d939e", shape: "circle" },
+  PENDENTE: { label: "Pendente", description: "Aguardando instalação", color: "var(--low)", hex: "#3aa8c1", shape: "ring" },
+  INATIVO: { label: "Inativo", description: "Furtado, desativado ou baixado", color: "var(--inactive)", hex: "#5c616b", shape: "ring" },
 };
 
 export const ROLE_LABELS: Record<AgentRole, string> = {
@@ -158,6 +171,16 @@ export function maintenanceDue(iso: string | null) {
   if (days < 0) return `vencida há ${-days} ${-days === 1 ? "dia" : "dias"}`;
   if (days === 0) return "vence hoje";
   return `em ${days} ${days === 1 ? "dia" : "dias"}`;
+}
+
+/**
+ * Cor da disponibilidade (barras e medidores), com os mesmos limites da saúde das regiões:
+ * neutro a partir de 80%, atenção abaixo disso e crítico abaixo de 60%.
+ */
+export function availabilityColor(percent: number) {
+  if (percent >= 80) return "var(--normal)";
+  if (percent >= 60) return "var(--medium)";
+  return "var(--critical)";
 }
 
 /** Tempo decorrido em texto curto: "agora", "há 40 s", "há 12 min", "há 3 h". */

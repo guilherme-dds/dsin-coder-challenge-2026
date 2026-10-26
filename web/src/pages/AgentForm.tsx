@@ -4,7 +4,7 @@ import { api, type AgentPayload } from "../api";
 import { ROLE_LABELS, SHIFT_LABELS } from "../labels";
 import type { AgentRole, Shift } from "../types";
 import { SectionHeader } from "../components/SectionHeader";
-import { IdCard, Building2, MapPin, MousePointerClick } from "lucide-react";
+import { MousePointerClick } from "lucide-react";
 import { CityMap } from "../components/CityMap";
 
 const empty: AgentPayload = {
@@ -67,7 +67,7 @@ export function AgentForm() {
       {error && <p className="error">{error}</p>}
 
       <section className="card">
-        <SectionHeader step={1} icon={IdCard} title="Identificação" />
+        <SectionHeader title="Identificação" />
         <div className="grid-3">
           {text("name", "Nome", true)}
           {text("registration", "Matrícula", true)}
@@ -88,7 +88,7 @@ export function AgentForm() {
       </section>
 
       <section className="card">
-        <SectionHeader step={2} icon={Building2} title="Lotação" />
+        <SectionHeader title="Lotação" />
         <div className="grid-3">
           {text("baseName", "Base", true)}
           {text("district", "Bairro", true)}
@@ -116,7 +116,7 @@ export function AgentForm() {
       </section>
 
       <section className="card">
-        <SectionHeader step={3} icon={MapPin} title="Posição no mapa operacional" />
+        <SectionHeader title="Posição no mapa operacional" />
         <p className="hint">
           <MousePointerClick size={14} /> Clique no mapa para marcar a base ou a área de atuação do agente.
         </p>
@@ -131,7 +131,7 @@ export function AgentForm() {
                     latitude: form.latitude,
                     longitude: form.longitude,
                     icon: form.role,
-                    color: "#ff6a2b",
+                    color: "#e4e6ea",
                     title: form.name || "Agente",
                   },
                 ]

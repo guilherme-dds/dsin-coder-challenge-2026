@@ -1,17 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { AvailabilityPoint } from "../types";
 
 interface Props {
   points: AvailabilityPoint[];
-  height?: number;
+  /** Altura mínima; o gráfico cresce para preencher o bloco quando ele é mais alto. */
+  minHeight?: number;
 }
 
 const PAD = { top: 16, right: 16, bottom: 28, left: 40 };
 const GRID = [0, 20, 40, 60, 80, 100];
 /** Mesmos limites da saúde das regiões: abaixo de 80% pede atenção, abaixo de 60% é crítico. */
 const THRESHOLDS = [
-  { value: 80, label: "atenção" },
-  { value: 60, label: "crítico" },
+  { value: 80, label: "atenção 80%", tone: "medium" },
+  { value: 60, label: "crítico 60%", tone: "critical" },
 ];
 
 /** Intervalos maiores que isso entre dois registros são buraco (API fora do ar): a linha é interrompida. */
@@ -23,17 +24,26 @@ const hourLabel = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { h
  * Disponibilidade ao longo do tempo: uma série, uma linha, eixo fixo de 0 a 100% para que
  * a queda não pareça maior (ou menor) do que é. Passar o mouse mostra o valor de cada registro.
  */
-export function AvailabilityChart({ points, height = 220 }: Props) {
-  const frame = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(640);
+export function AvailabilityChart({ points, minHeight = 220 }: Props) {
+  const frame = useRef<HTMLDivElement | null>(null);
+  const observer = useRef<ResizeObserver | null>(null);
+  const [size, setSize] = useState({ width: 640, height: minHeight });
   const [hover, setHover] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!frame.current) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
-    observer.observe(frame.current);
-    return () => observer.disconnect();
-  }, []);
+  // Ref de callback: o quadro só existe quando há registros, e pode surgir depois da primeira carga.
+  const attach = useCallback(
+    (node: HTMLDivElement | null) => {
+      observer.current?.disconnect();
+      frame.current = node;
+      if (!node) return;
+      observer.current = new ResizeObserver(([entry]) =>
+        setSize({ width: entry.contentRect.width, height: Math.max(entry.contentRect.height, minHeight) }),
+      );
+      observer.current.observe(node);
+    },
+    [minHeight],
+  );
+  const { width, height } = size;
 
   if (points.length < 2) {
     return <p className="muted">Ainda não há registros suficientes para o gráfico.</p>;
@@ -76,7 +86,7 @@ export function AvailabilityChart({ points, height = 220 }: Props) {
   const activeX = active ? x(active.takenAt) : 0;
 
   return (
-    <div className="chart-frame" ref={frame} style={{ height }}>
+    <div className="chart-frame" ref={attach} style={{ minHeight }}>
       <svg
         width={width}
         height={height}
@@ -85,12 +95,6 @@ export function AvailabilityChart({ points, height = 220 }: Props) {
         onMouseMove={(e) => onMove(e.clientX)}
         onMouseLeave={() => setHover(null)}
       >
-        <defs>
-          <linearGradient id="availability-fill" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="var(--ember)" stopOpacity="0.22" />
-            <stop offset="100%" stopColor="var(--ember)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
 
         {GRID.map((g) => (
           <g key={g}>
@@ -102,7 +106,7 @@ export function AvailabilityChart({ points, height = 220 }: Props) {
         ))}
         {THRESHOLDS.map((t) => (
           <g key={t.value}>
-            <line className="chart-threshold" x1={PAD.left} x2={PAD.left + plotW} y1={y(t.value)} y2={y(t.value)} />
+            <line className={`chart-threshold ${t.tone}`} x1={PAD.left} x2={PAD.left + plotW} y1={y(t.value)} y2={y(t.value)} />
             <text className="chart-axis" x={PAD.left + plotW} y={y(t.value) - 5} textAnchor="end">
               {t.label}
             </text>
@@ -123,7 +127,7 @@ export function AvailabilityChart({ points, height = 220 }: Props) {
         {segments.map((segment) =>
           segment.length > 1 ? (
             <g key={segment[0].takenAt}>
-              <path d={areaPath(segment)} fill="url(#availability-fill)" />
+              <path d={areaPath(segment)} className="chart-area" />
               <path d={linePath(segment)} className="chart-line" />
             </g>
           ) : (
