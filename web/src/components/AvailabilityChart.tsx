@@ -15,20 +15,36 @@ const THRESHOLDS = [
   { value: 60, label: "crítico 60%", tone: "critical" },
 ];
 
-/** Intervalos maiores que isso entre dois registros são buraco (API fora do ar): a linha é interrompida. */
-const GAP_MS = 60 * 60 * 1000;
+/**
+ * Intervalos maiores que isso entre dois registros são buraco (API fora do ar): a linha é interrompida.
+ * Folga sobre a cadência mais espaçada (o histórico da seed é de hora em hora) para atrasos pequenos não cortarem a linha.
+ */
+const GAP_MS = 90 * 60 * 1000;
+/** Larguras mínimas (px) para o rótulo do vão caber inteiro ou abreviado. */
+const GAP_LABEL_FULL = 190;
+const GAP_LABEL_SHORT = 70;
 
 const hourLabel = (iso: string) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+const dateTimeLabel = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+
+function durationLabel(fromIso: string, toIso: string) {
+  const minutes = Math.round((new Date(toIso).getTime() - new Date(fromIso).getTime()) / 60000);
+  const hours = Math.floor(minutes / 60);
+  return hours ? `${hours} h${minutes % 60 ? ` ${minutes % 60} min` : ""}` : `${minutes} min`;
+}
+
+type Hover = { kind: "point"; index: number } | { kind: "gap"; index: number } | null;
 
 /**
  * Disponibilidade ao longo do tempo: uma série, uma linha, eixo fixo de 0 a 100% para que
  * a queda não pareça maior (ou menor) do que é. Passar o mouse mostra o valor de cada registro.
+ * Períodos sem registro aparecem marcados como "sem dados": o sistema estava fora do ar e nada foi medido.
  */
 export function AvailabilityChart({ points, minHeight = 220 }: Props) {
   const frame = useRef<HTMLDivElement | null>(null);
   const observer = useRef<ResizeObserver | null>(null);
   const [size, setSize] = useState({ width: 640, height: minHeight });
-  const [hover, setHover] = useState<number | null>(null);
+  const [hover, setHover] = useState<Hover>(null);
 
   // Ref de callback: o quadro só existe quando há registros, e pode surgir depois da primeira carga.
   const attach = useCallback(
@@ -63,6 +79,12 @@ export function AvailabilityChart({ points, minHeight = 220 }: Props) {
     if (i === 0 || gap) segments.push([]);
     segments[segments.length - 1].push(p);
   });
+  // Vãos entre um trecho e o seguinte: do último registro antes da parada ao primeiro depois dela
+  const gaps = segments.slice(1).map((segment, i) => ({
+    from: segments[i][segments[i].length - 1].takenAt,
+    to: segment[0].takenAt,
+  }));
+
   const linePath = (segment: AvailabilityPoint[]) =>
     segment.map((p, i) => `${i ? "L" : "M"}${x(p.takenAt).toFixed(1)},${y(p.availability).toFixed(1)}`).join("");
   const areaPath = (segment: AvailabilityPoint[]) =>
@@ -73,17 +95,22 @@ export function AvailabilityChart({ points, minHeight = 220 }: Props) {
   const ticks = Array.from({ length: tickCount + 1 }, (_, i) => new Date(t0 + ((t1 - t0) * i) / tickCount).toISOString());
 
   const onMove = (clientX: number) => {
-    const left = frame.current!.getBoundingClientRect().left;
-    const mouse = clientX - left;
+    const mouse = clientX - frame.current!.getBoundingClientRect().left;
+    const gapIndex = gaps.findIndex((g) => mouse > x(g.from) && mouse < x(g.to));
+    if (gapIndex !== -1) {
+      setHover({ kind: "gap", index: gapIndex });
+      return;
+    }
     let nearest = 0;
     points.forEach((p, i) => {
       if (Math.abs(x(p.takenAt) - mouse) < Math.abs(x(points[nearest].takenAt) - mouse)) nearest = i;
     });
-    setHover(nearest);
+    setHover({ kind: "point", index: nearest });
   };
 
-  const active = hover !== null ? points[hover] : null;
+  const active = hover?.kind === "point" ? points[hover.index] : null;
   const activeX = active ? x(active.takenAt) : 0;
+  const activeGap = hover?.kind === "gap" ? gaps[hover.index] : null;
 
   return (
     <div className="chart-frame" ref={attach} style={{ minHeight }}>
@@ -91,10 +118,19 @@ export function AvailabilityChart({ points, minHeight = 220 }: Props) {
         width={width}
         height={height}
         role="img"
-        aria-label={`Disponibilidade de ${points[0].availability}% a ${points[points.length - 1].availability}% no período`}
+        aria-label={
+          `Disponibilidade de ${points[0].availability}% a ${points[points.length - 1].availability}% no período` +
+          (gaps.length ? `, com ${gaps.length} período(s) sem dados (sistema fora do ar)` : "")
+        }
         onMouseMove={(e) => onMove(e.clientX)}
         onMouseLeave={() => setHover(null)}
       >
+        <defs>
+          {/* Hachura discreta: marca "não medido" sem parecer um valor */}
+          <pattern id="chart-gap-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="6" className="chart-gap-stripe" />
+          </pattern>
+        </defs>
 
         {GRID.map((g) => (
           <g key={g}>
@@ -104,6 +140,24 @@ export function AvailabilityChart({ points, minHeight = 220 }: Props) {
             </text>
           </g>
         ))}
+
+        {gaps.map((g, i) => {
+          const left = x(g.from);
+          const gapWidth = x(g.to) - left;
+          const label = gapWidth >= GAP_LABEL_FULL ? "Sem dados · sistema fora do ar" : gapWidth >= GAP_LABEL_SHORT ? "Sem dados" : null;
+          return (
+            <g key={g.from} className={`chart-gap ${hover?.kind === "gap" && hover.index === i ? "on" : ""}`}>
+              <rect x={left} y={PAD.top} width={gapWidth} height={plotH} fill="url(#chart-gap-hatch)" />
+              <rect x={left} y={PAD.top} width={gapWidth} height={plotH} className="chart-gap-area" />
+              {label && (
+                <text className="chart-gap-label" x={left + gapWidth / 2} y={PAD.top + plotH / 2} textAnchor="middle" dominantBaseline="middle">
+                  {label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
         {THRESHOLDS.map((t) => (
           <g key={t.value}>
             <line className={`chart-threshold ${t.tone}`} x1={PAD.left} x2={PAD.left + plotW} y1={y(t.value)} y2={y(t.value)} />
@@ -153,11 +207,27 @@ export function AvailabilityChart({ points, minHeight = 220 }: Props) {
             top: y(active.availability) < 80 ? y(active.availability) + 12 : y(active.availability) - 12,
           }}
         >
-          <span className="muted">{new Date(active.takenAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>
+          <span className="muted">{dateTimeLabel(active.takenAt)}</span>
           <strong>{active.availability}% disponível</strong>
           <span>
             {active.operational} de {active.installed} operando · {active.openAlerts} alertas
           </span>
+        </div>
+      )}
+
+      {activeGap && (
+        <div
+          className="chart-tooltip below"
+          style={{
+            left: Math.min(Math.max((x(activeGap.from) + x(activeGap.to)) / 2, 120), width - 120),
+            top: PAD.top + 8,
+          }}
+        >
+          <strong>Sem dados</strong>
+          <span>
+            {dateTimeLabel(activeGap.from)} → {hourLabel(activeGap.to)} ({durationLabel(activeGap.from, activeGap.to)})
+          </span>
+          <span className="muted">Sistema fora do ar: nada foi medido neste período.</span>
         </div>
       )}
     </div>

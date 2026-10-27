@@ -12,6 +12,9 @@ npx prisma migrate deploy
 if [ "$first_run" = true ] || [ "$SEED_ON_START" = "true" ]; then
   echo "Populando o banco com dados de exemplo..."
   npx prisma db seed
+elif [ "$BACKFILL_ON_START" = "true" ]; then
+  # Demonstração: completa o período em que o sistema esteve desligado; uma falha aqui não impede a API de subir
+  npx tsx scripts/backfill.ts || echo "Preenchimento ignorado."
 fi
 
 exec "$@"

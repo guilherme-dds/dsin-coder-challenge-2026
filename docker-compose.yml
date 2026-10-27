@@ -7,6 +7,8 @@ services:
       DATABASE_URL: file:/data/fogo.db
       PORT: 3333
       SEED_ON_START: ${SEED_ON_START:-false}
+      # Demonstração: ao subir, completa o período em que o sistema esteve desligado
+      BACKFILL_ON_START: ${BACKFILL_ON_START:-true}
     volumes:
       - db-data:/data
     ports:

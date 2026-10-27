@@ -8,6 +8,7 @@
     "start": "node --env-file=.env dist/index.js",
     "typecheck": "tsc --noEmit",
     "simulate": "tsx scripts/simulate.ts",
+    "backfill": "tsx scripts/backfill.ts",
     "db:setup": "prisma migrate dev && prisma db seed",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",

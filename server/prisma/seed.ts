@@ -602,7 +602,8 @@ async function main() {
       const unavailable = Math.min(installed, Math.max(0, unavailableNow + swing - decline));
       return {
         regionId,
-        takenAt: new Date(now.getTime() - (AVAILABILITY_HISTORY_HOURS - h) * 60 * MINUTE_MS),
+        // O último registro é o de agora: o histórico emenda com as fotografias do servidor sem buraco
+        takenAt: new Date(now.getTime() - (AVAILABILITY_HISTORY_HOURS - 1 - h) * 60 * MINUTE_MS),
         total,
         installed,
         operational: installed - unavailable,

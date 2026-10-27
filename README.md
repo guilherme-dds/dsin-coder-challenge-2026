@@ -47,6 +47,13 @@ ocorrências, e a API consolida a telemetria em resumos diários de hora em hora
 Para recriar o histórico num banco Docker já existente: `SEED_ON_START=true docker compose up -d server` (apaga os
 dados atuais).
 
+**Períodos com o sistema desligado.** Se o ambiente ficar parado (ex.: Docker desligado durante a noite), não há
+registros desse período, e os gráficos o mostram como "sem dados". No Docker, ao subir, o servidor roda um
+**preenchimento de demonstração** ([backfill.ts](server/scripts/backfill.ts)) que completa as paradas dos últimos
+7 dias como o simulador teria feito: disponibilidade de hora em hora (interpolada entre antes e depois da parada) e
+ocorrências pelo perfil da cidade. Só acrescenta registros e não duplica se rodar de novo. Desligue com
+`BACKFILL_ON_START=false`, ou rode à mão com `npm run backfill`.
+
 ### Com Docker
 
 ```bash

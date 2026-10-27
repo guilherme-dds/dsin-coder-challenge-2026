@@ -1530,6 +1530,29 @@ tr.clickable:hover td {
   stroke-linecap: round;
 }
 
+/* Período sem registro (sistema fora do ar): hachura discreta e rótulo, nunca uma linha inventada */
+.chart-gap-stripe {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.chart-gap-area {
+  fill: transparent;
+}
+
+.chart-gap.on .chart-gap-area {
+  fill: var(--hover);
+  fill-opacity: 0.5;
+}
+
+.chart-gap-label {
+  fill: var(--muted);
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: var(--panel);
+  stroke-width: 4px;
+}
+
 .chart-crosshair {
   stroke: var(--text-2);
   stroke-dasharray: 2 3;
